@@ -9,6 +9,7 @@
 
 #include "WiFiAccessPoint.hpp"
 #include "Logger.hpp"
+#include "HttpServer.hpp"
 
 extern "C" void app_main(void)
 {
@@ -25,6 +26,9 @@ extern "C" void app_main(void)
     // Create an Access Point
     WiFiAccessPoint ap("esp-ducky", "ducky123");
     ap.start();
+
+    HttpServer http{};
+    http.start();
 
     // Infinite loop to keep the task running
     for (unsigned int i = 0;; i++) {

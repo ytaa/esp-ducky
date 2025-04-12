@@ -1,25 +1,27 @@
+#pragma once
+
 #include <array>
 #include <string>
 #include <cstdint>
 
-#define LOGD(...) Logger::get().log(Logger::Level::DEBUG, __VA_ARGS__)
-#define LOGI(...) Logger::get().log(Logger::Level::INFO, __VA_ARGS__)
-#define LOGW(...) Logger::get().log(Logger::Level::WARNING, __VA_ARGS__)
-#define LOGE(...) Logger::get().log(Logger::Level::ERROR, __VA_ARGS__)
-#define LOGC(...) Logger::get().log(Logger::Level::CRITICAL, __VA_ARGS__)
+#define LOGD(...) Logger::get().log(Logger::Level::Debug, __VA_ARGS__)
+#define LOGI(...) Logger::get().log(Logger::Level::Info, __VA_ARGS__)
+#define LOGW(...) Logger::get().log(Logger::Level::Warning, __VA_ARGS__)
+#define LOGE(...) Logger::get().log(Logger::Level::Error, __VA_ARGS__)
+#define LOGC(...) Logger::get().log(Logger::Level::Critical, __VA_ARGS__)
 
 class Logger {
 public:
     enum class Level : std::uint8_t {
-        DEBUG,
-        INFO,
-        WARNING,
-        ERROR,
-        CRITICAL,
-        LEVEL_COUNT
+        Debug,
+        Info,
+        Warning,
+        Error,
+        Critical,
+        LevelNum
     };
 
-    static const std::array<std::string, static_cast<size_t>(Level::LEVEL_COUNT)> levelNames;
+    static const std::array<std::string, static_cast<size_t>(Level::LevelNum)> levelNames;
 
     Level level;
 

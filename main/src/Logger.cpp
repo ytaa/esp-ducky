@@ -11,7 +11,7 @@
 #define MAG   "\x1B[35m"
 #define RESET "\x1B[0m"
 
-const std::array<std::string, static_cast<size_t>(Logger::Level::LEVEL_COUNT)> Logger::levelNames{
+const std::array<std::string, static_cast<size_t>(Logger::Level::LevelNum)> Logger::levelNames{
     GRN "DBG" RESET,
     BLU "INF" RESET,
     YEL "WRN" RESET,
@@ -19,7 +19,7 @@ const std::array<std::string, static_cast<size_t>(Logger::Level::LEVEL_COUNT)> L
     MAG "CRI" RESET
 };
 
-Logger::Logger() : level(Logger::Level::DEBUG) {}
+Logger::Logger() : level(Logger::Level::Debug) {}
 
 Logger& Logger::get() {
     static Logger *instance = new Logger();
@@ -52,7 +52,7 @@ void Logger::log(Logger::Level level, const char *fmt, ...) {
 }
 
 void Logger::setLevel(Logger::Level newLevel) {
-    if (newLevel >= Logger::Level::LEVEL_COUNT) {
+    if (newLevel >= Logger::Level::LevelNum) {
         LOGE("Invalid log level: %u\n", static_cast<unsigned int>(newLevel));
         return;
     }
