@@ -2,9 +2,18 @@
 
 #include "esp_http_server.h"
 
+#include <unordered_map>
+#include <string>
+
 #include "Utils.hpp"
 
 class HttpServer {
+    struct UriHandler {
+        httpd_uri_t uri;
+        const char *respBuf;
+        size_t respLen;
+    };
+
 public:
     HttpServer();
     ~HttpServer() = default;
@@ -12,8 +21,8 @@ public:
     ErrorCode start();
     void stop();
 
-    static esp_err_t cbk_get_index(httpd_req_t *req);
+    static esp_err_t cbk_handle_uri(httpd_req_t *req);
 private:
     httpd_handle_t server;
-    httpd_uri_t uri_get_index;
+    const std::unordered_map<std::string, UriHandler> uriHandlers;
 };

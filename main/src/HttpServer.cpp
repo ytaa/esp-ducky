@@ -1,13 +1,27 @@
 #include "HttpServer.hpp"
 #include "Logger.hpp"
 
+extern char _binary_C__w_esp_ducky_main_web_index_html_start;
+extern char _binary_C__w_esp_ducky_main_web_index_html_end;
+extern char _binary_C__w_esp_ducky_main_web_script_js_start;
+extern char _binary_C__w_esp_ducky_main_web_script_js_end;
+
 HttpServer::HttpServer(): 
 server(NULL), 
-uri_get_index({
-    .uri = "/",
-    .method = HTTP_GET,
-    .handler = cbk_get_index,
-    .user_ctx = this
+uriHandlers(
+{
+    {"/", {
+            .uri = {.uri="/", .method=HTTP_GET, .handler=cbk_handle_uri, .user_ctx=this}, 
+            .respBuf = (const char*)&_binary_C__w_esp_ducky_main_web_index_html_start, 
+            .respLen = (size_t)(&_binary_C__w_esp_ducky_main_web_index_html_end - &_binary_C__w_esp_ducky_main_web_index_html_start)
+          }
+    },
+    {"/script.js", {
+        .uri = {.uri="/script.js", .method=HTTP_GET, .handler=cbk_handle_uri, .user_ctx=this}, 
+        .respBuf = (const char*)&_binary_C__w_esp_ducky_main_web_script_js_start, 
+        .respLen = (size_t)(&_binary_C__w_esp_ducky_main_web_script_js_end - &_binary_C__w_esp_ducky_main_web_script_js_start)
+      }
+}
 }) {}
 
 ErrorCode HttpServer::start(){
@@ -25,7 +39,12 @@ ErrorCode HttpServer::start(){
     }
 
     /* Register URI handlers */
-    httpd_register_uri_handler(server, &uri_get_index);
+    for (const auto & [uri, handler] : uriHandlers) {
+        esp_err_t err = httpd_register_uri_handler(server, &handler.uri);
+        if(err) {
+            LOGE("Failed to register URI handler for %s with code: %d", uri.c_str(), err);
+        }
+    }
 
     LOGI("HTTP Server started");
 
@@ -39,10 +58,11 @@ void HttpServer::stop(){
     }
 }
 
-esp_err_t HttpServer::cbk_get_index(httpd_req_t *req)
+esp_err_t HttpServer::cbk_handle_uri(httpd_req_t *req)
 {
-    /* Send a simple response */
-    const char resp[] = "URI GET Response";
-    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+    HttpServer *httpServer = (HttpServer *)req->user_ctx;
+    const UriHandler &handler = httpServer->uriHandlers.at(req->uri);
+    //httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, handler.respBuf, handler.respLen);
     return ESP_OK;
 }
