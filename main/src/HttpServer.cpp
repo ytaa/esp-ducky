@@ -4,7 +4,7 @@
 HttpServer::HttpServer(): 
 server(NULL), 
 uri_get_index({
-    .uri = "/index.html",
+    .uri = "/",
     .method = HTTP_GET,
     .handler = cbk_get_index,
     .user_ctx = this
