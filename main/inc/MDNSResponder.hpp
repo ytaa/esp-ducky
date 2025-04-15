@@ -4,10 +4,10 @@
 
 #include "Utils.hpp"
 
-class MDNSResponder {
+class MdnsResponder {
 public:
-    MDNSResponder(std::string hostname);
-    ~MDNSResponder() = default;
+    MdnsResponder(std::string hostname);
+    ~MdnsResponder() = default;
     
     ErrorCode start();
 private:

@@ -1,12 +1,12 @@
 #include "mdns.h"
 
-#include "MDNSResponder.hpp"
+#include "MdnsResponder.hpp"
 #include "Logger.hpp"
 
-MDNSResponder::MDNSResponder(std::string hostname)
+MdnsResponder::MdnsResponder(std::string hostname)
 :hostname(hostname){}
 
-ErrorCode MDNSResponder::start() {
+ErrorCode MdnsResponder::start() {
     //initialize mDNS service
     esp_err_t err = mdns_init();
     if (err) {
