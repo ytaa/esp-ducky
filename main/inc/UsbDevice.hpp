@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string>
+#include <vector>
 
 #include "tinyusb.h"
 #include "class/hid/hid_device.h"
@@ -17,20 +18,28 @@ class UsbDevice
 {
 private:
     bool isStartedFlag;
+    std::vector<uint8_t> reportDescriptor;
+    std::vector<const char *> stringDescriptor;
+    std::vector<uint8_t> configurationDescriptor;
+    static std::vector<UsbDevice*> instances;
 public:
 
     UsbDevice();
-    virtual ~UsbDevice() = default;
+    virtual ~UsbDevice();
 
     ErrorCode start();
     ErrorCode stop();
 
-    bool isStarted();
-    bool isMounted();
+    bool isStarted() const;
+    bool isMounted() const;
+
+    const uint8_t *getReportDescriptor() const;
 
     ErrorCode enableJTAG();
 
     void hidKeyboardReport(std::initializer_list<uint8_t> keysList, uint8_t modifier = 0u);
     void hidKeyStroke(std::initializer_list<uint8_t> keysList, uint8_t modifier = 0u, uint32_t delay = 50u);
     void hidKeyWrite(std::string text, uint8_t modifier = 0u, uint32_t delay = 50u);
+
+    static UsbDevice* getInstance(uint8_t instanceIdx);
 };

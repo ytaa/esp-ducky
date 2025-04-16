@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "driver/usb_serial_jtag.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -7,44 +9,56 @@
 
 #define TUSB_DESC_TOTAL_LEN      (TUD_CONFIG_DESC_LEN + CFG_TUD_HID * TUD_HID_DESC_LEN)
 
-static const uint8_t hid_report_descriptor[] = {
+std::vector<UsbDevice*> UsbDevice::instances{};
+
+UsbDevice::UsbDevice() :
+isStartedFlag(false),
+reportDescriptor({
     TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(HID_ITF_PROTOCOL_KEYBOARD)),
     TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(HID_ITF_PROTOCOL_MOUSE))
-};
-
-static const char* hid_string_descriptor[] = {
+}),
+stringDescriptor({
     // array of pointer to string descriptors
     (char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
     "TinyUSB",             // 1: Manufacturer
     "TinyUSB Device",      // 2: Product
     "123456",              // 3: Serials, should use chip ID
     "Example HID interface",  // 4: HID
-};
-
-static const uint8_t hid_configuration_descriptor[] = {
+}),
+configurationDescriptor({
     // Configuration number, interface count, string index, total length, attribute, power in mA
     TUD_CONFIG_DESCRIPTOR(1, 1, 0, TUSB_DESC_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
     // Interface number, string index, boot protocol, report descriptor len, EP In address, size & polling interval
-    TUD_HID_DESCRIPTOR(0, 4, false, sizeof(hid_report_descriptor), 0x81, 16, 10),
-};
+    TUD_HID_DESCRIPTOR(0, 4, false, reportDescriptor.size(), 0x81, 16, 10),
+})
+{
+    instances.push_back(this);
+}
 
-UsbDevice::UsbDevice() :
-isStartedFlag(false)
-{}
+UsbDevice::~UsbDevice() {
+    if(isStartedFlag) {
+        stop();
+    }
+
+    auto it = std::find(instances.begin(), instances.end(), this);
+    if (it != instances.end()) {
+        instances.erase(it);
+    }
+}
 
 ErrorCode UsbDevice::start() {
     const tinyusb_config_t tusb_cfg = {
         .device_descriptor = NULL,
-        .string_descriptor = hid_string_descriptor,
-        .string_descriptor_count = sizeof(hid_string_descriptor) / sizeof(hid_string_descriptor[0]),
+        .string_descriptor = stringDescriptor.data(),
+        .string_descriptor_count = static_cast<int>(stringDescriptor.size()),
         .external_phy = false,
 #if (TUD_OPT_HIGH_SPEED)
         .fs_configuration_descriptor = hid_configuration_descriptor, // HID configuration descriptor for full-speed and high-speed are the same
         .hs_configuration_descriptor = hid_configuration_descriptor,
         .qualifier_descriptor = NULL,
 #else
-        .configuration_descriptor = hid_configuration_descriptor,
+        .configuration_descriptor = configurationDescriptor.data(),
 #endif // TUD_OPT_HIGH_SPEED
         .self_powered = false,
         .vbus_monitor_io = 0
@@ -74,12 +88,16 @@ ErrorCode UsbDevice::stop(){
     return ErrorCode::Success;
 }
 
-bool UsbDevice::isStarted() {
+bool UsbDevice::isStarted() const{
     return isStartedFlag;
 }
 
-bool UsbDevice::isMounted() {
+bool UsbDevice::isMounted() const{
     return tud_mounted();
+}
+
+const uint8_t *UsbDevice::getReportDescriptor() const{
+    return reportDescriptor.data();
 }
 
 ErrorCode UsbDevice::enableJTAG(){
@@ -126,22 +144,11 @@ void UsbDevice::hidKeyWrite(std::string text, uint8_t modifier, uint32_t delay){
     }
 }
 
-uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance){
-    // We use only one interface and one HID report descriptor, so we can ignore parameter 'instance'
-    (void) instance;
-    return hid_report_descriptor;
-}
-
-uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t* buffer, uint16_t reqlen){
-    (void) instance;
-    (void) report_id;
-    (void) report_type;
-    (void) buffer;
-    (void) reqlen;
-
-    return 0;
-}
-
-void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize){
-    return;
+UsbDevice* UsbDevice::getInstance(uint8_t instanceIdx)
+{
+    if(instanceIdx < instances.size()) {
+        return instances[instanceIdx];
+    } else {
+        return nullptr;
+    }
 }
