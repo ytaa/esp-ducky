@@ -15,4 +15,4 @@ dependencies:
   #   # All dependencies of `main` are public by default.
   #   public: true
   espressif/mdns: '*'
-  espressif/esp_tinyusb: "^1.1"
+  espressif/esp_tinyusb: ^1.1
