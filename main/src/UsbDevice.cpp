@@ -112,7 +112,7 @@ ErrorCode UsbDevice::enableJTAG(){
     return ErrorCode::Success;
 }
 
-void UsbDevice::hidKeyboardReport(std::initializer_list<uint8_t> keysList, uint8_t modifier) {
+void UsbDevice::hidSendKeyboardReport(const std::vector<uint8_t> &keysList, uint8_t modifier) {
     if(keysList.size() > 0 && keysList.size() <= 6) {
         uint8_t keycode[6] = {0};
         uint8_t i = 0;
@@ -127,21 +127,11 @@ void UsbDevice::hidKeyboardReport(std::initializer_list<uint8_t> keysList, uint8
     }
 }
 
-void UsbDevice::hidKeyStroke(std::initializer_list<uint8_t> keysList, uint8_t modifier, uint32_t delay) {
-    hidKeyboardReport(keysList, modifier);
+void UsbDevice::hidKeyStroke(const std::vector<uint8_t> &keysList, uint8_t modifier, uint32_t delay) {
+    hidSendKeyboardReport(keysList, modifier);
     vTaskDelay(delay / portTICK_PERIOD_MS);
-    hidKeyboardReport({0}, 0);
+    (void)tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);
     vTaskDelay(delay / portTICK_PERIOD_MS);
-}
-
-void UsbDevice::hidKeyWrite(std::string text, uint8_t modifier, uint32_t delay){
-    for (unsigned char chr : text) {
-        if (chr < 128) {
-            uint8_t const conv_table[128][2] =  { HID_ASCII_TO_KEYCODE };
-            if (conv_table[chr][0]) modifier = KEYBOARD_MODIFIER_LEFTSHIFT;
-            hidKeyStroke({conv_table[chr][1]}, modifier, delay);
-        }
-    }
 }
 
 UsbDevice* UsbDevice::getInstance(uint8_t instanceIdx)

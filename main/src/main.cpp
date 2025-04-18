@@ -15,6 +15,7 @@
 #include "HttpServer.hpp"
 #include "MdnsResponder.hpp"
 #include "UsbDevice.hpp"
+#include "Script.hpp"
 
 #define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
 
@@ -62,6 +63,24 @@ extern "C" void app_main(void)
     UsbDevice usb{};
     usb.start();
 
+    std::string scriptStr = R"(
+    GUI r
+    DELAY 500
+    STRING notepad.exe
+    ENTER
+    DELAY 500
+    CTRL n
+    DELAY 50
+    STRING Hello World!
+    )";
+
+    auto script = Script::parse(scriptStr);
+    if (script) {
+        LOGI("Parsed script successfully");
+    } else {
+        LOGE("Failed to parse script");
+    }
+
     uint8_t usbDeviceDisableCountdown = 3;
     bool isHidDemoFinished = false;
 
@@ -87,11 +106,13 @@ extern "C" void app_main(void)
                     if(!isHidDemoFinished) {
                         LOGI("Starting HID demo");
 
-                        usb.hidKeyStroke({HID_KEY_GUI_LEFT, HID_KEY_R});
+                        /*(usb.hidKeyStroke({HID_KEY_GUI_LEFT, HID_KEY_R});
                         usb.hidKeyWrite("notepad.exe", 0, 25);
                         usb.hidKeyStroke({HID_KEY_ENTER}, 0, 500);
                         usb.hidKeyStroke({HID_KEY_CONTROL_LEFT, HID_KEY_N});
-                        usb.hidKeyWrite("test", 0, 25);
+                        usb.hidKeyWrite("test", 0, 25);*/
+
+                        script->run(usb);
 
                         isHidDemoFinished = true;
                         LOGI("HID demo finished");

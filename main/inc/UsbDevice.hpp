@@ -37,9 +37,8 @@ public:
 
     ErrorCode enableJTAG();
 
-    void hidKeyboardReport(std::initializer_list<uint8_t> keysList, uint8_t modifier = 0u);
-    void hidKeyStroke(std::initializer_list<uint8_t> keysList, uint8_t modifier = 0u, uint32_t delay = 50u);
-    void hidKeyWrite(std::string text, uint8_t modifier = 0u, uint32_t delay = 50u);
+    void hidSendKeyboardReport(const std::vector<uint8_t> &keysList, uint8_t modifier = 0u);
+    void hidKeyStroke(const std::vector<uint8_t> &keysList, uint8_t modifier = 0u, uint32_t delay = 14u);
 
     static UsbDevice* getInstance(uint8_t instanceIdx);
 };
