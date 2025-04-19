@@ -5,10 +5,11 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
         set(file_obj "${CMAKE_CURRENT_BINARY_DIR}/${file}.obj")
         list(APPEND WEB_FILES_OBJ "${file_obj}")
         add_custom_target(${file}_object 
-                            DEPENDS ${file_obj}
+                            DEPENDS ${CMAKE_CURRENT_LIST_DIR}/web/${file}
                             VERBATIM)
 
         add_custom_command(OUTPUT ${file_obj}
+                            DEPENDS ${CMAKE_CURRENT_LIST_DIR}/web/${file}
                             COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-xtensa-le --binary-architecture xtensa ${CMAKE_CURRENT_LIST_DIR}/web/${file} ${file_obj}
                             COMMENT Coverts ${file} to object file)
     endforeach()
