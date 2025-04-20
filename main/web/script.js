@@ -18,7 +18,7 @@ function postScript() {
 
     // Create an unsubscription request json with the unique client ID
     let scriptReq = {
-        "scriptText": scriptText,
+        "script": scriptText,
         "action": 0,
     };
 

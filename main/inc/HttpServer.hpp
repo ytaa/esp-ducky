@@ -1,35 +1,34 @@
 #pragma once
 
-#include "esp_http_server.h"
-
 #include <unordered_map>
 #include <string>
+#include <array>
+#include <functional>
+#include <memory>
+
+#include "esp_http_server.h"
 
 #include "Utils.hpp"
 
 class HttpServer {
+public:
     struct StaticEndpoint {
-        httpd_uri_t uriHandler;
         const char *respBuf;
         size_t respLen;
     };
 
-public:
-    HttpServer();
+    explicit HttpServer(std::unordered_map<std::string, StaticEndpoint> &&staticEndpoints, 
+        std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>> &&dynamicEndpointCallbacks);
     ~HttpServer() = default;
 
     ErrorCode start();
     void stop();
 
-    static esp_err_t cbk_handle_static_get(httpd_req_t *req);
-    static esp_err_t cbk_handle_get_script(httpd_req_t *req);
-    static esp_err_t cbk_handle_post_script(httpd_req_t *req);
-    static esp_err_t cbk_handle_get_config(httpd_req_t *req);
-    static esp_err_t cbk_handle_post_config(httpd_req_t *req);
-private:
-    constexpr static size_t DYNAMIC_ENDPOINTS_COUNT = 4u;
+    static esp_err_t handleStaticEndpoint(httpd_req_t *req);
+    static esp_err_t handleDynamicEndpoint(httpd_req_t *req);
 
+private:
     httpd_handle_t server;
     const std::unordered_map<std::string, StaticEndpoint> staticEndpoints;
-    const std::array<httpd_uri_t, DYNAMIC_ENDPOINTS_COUNT> dynamicEndpoints;
+    const std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>> dynamicEndpointCallbacks;
 };

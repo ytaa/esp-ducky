@@ -1,36 +1,14 @@
 #include <algorithm>
-#include <memory>
 
 #include "HttpServer.hpp"
 #include "Logger.hpp"
 
-extern char _binary_C__w_esp_ducky_main_web_index_html_start;
-extern char _binary_C__w_esp_ducky_main_web_index_html_end;
-extern char _binary_C__w_esp_ducky_main_web_script_js_start;
-extern char _binary_C__w_esp_ducky_main_web_script_js_end;
-
-HttpServer::HttpServer(): 
+HttpServer::HttpServer(std::unordered_map<std::string, StaticEndpoint> &&staticEndpoints, 
+    std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>> &&dynamicEndpointCallbacks): 
 server(NULL), 
-staticEndpoints({
-    {"/", {
-            .uriHandler = {.uri="/", .method=HTTP_GET, .handler=cbk_handle_static_get, .user_ctx=this}, 
-            .respBuf = (const char*)&_binary_C__w_esp_ducky_main_web_index_html_start, 
-            .respLen = (size_t)(&_binary_C__w_esp_ducky_main_web_index_html_end - &_binary_C__w_esp_ducky_main_web_index_html_start)
-        }
-    },
-    {"/script.js", {
-            .uriHandler = {.uri="/script.js", .method=HTTP_GET, .handler=cbk_handle_static_get, .user_ctx=this}, 
-            .respBuf = (const char*)&_binary_C__w_esp_ducky_main_web_script_js_start, 
-            .respLen = (size_t)(&_binary_C__w_esp_ducky_main_web_script_js_end - &_binary_C__w_esp_ducky_main_web_script_js_start)
-        }
-    }
-}),
-dynamicEndpoints({{
-    {.uri="/script", .method=HTTP_GET, .handler=cbk_handle_get_script, .user_ctx=this},
-    {.uri="/script", .method=HTTP_POST, .handler=cbk_handle_post_script, .user_ctx=this},
-    {.uri="/config", .method=HTTP_GET, .handler=cbk_handle_get_config, .user_ctx=this},
-    {.uri="/config", .method=HTTP_POST, .handler=cbk_handle_post_config, .user_ctx=this}
-}}) {}
+staticEndpoints(std::move(staticEndpoints)),
+dynamicEndpointCallbacks(std::move(dynamicEndpointCallbacks))
+{}
 
 ErrorCode HttpServer::start(){
     /* Generate default configuration */
@@ -47,17 +25,35 @@ ErrorCode HttpServer::start(){
 
     /* Register URI handlers for static endpoints */
     for (const auto & [uri, endpoint] : staticEndpoints) {
-        esp_err_t err = httpd_register_uri_handler(server, &endpoint.uriHandler);
+        httpd_uri_t uriHandler = {
+            .uri=uri.c_str(), 
+            .method=HTTP_GET, 
+            .handler=handleStaticEndpoint, 
+            .user_ctx=this
+        };
+        esp_err_t err = httpd_register_uri_handler(server, &uriHandler);
         if(err) {
-            LOGE("Failed to register URI handler for '%s' with code: '%d'", uri.c_str(), err);
+            LOGE("Failed to register URI GET handler for '%s' with code: '%d'", uri.c_str(), err);
         }
     }
 
     /* Register URI handlers for dynamic endpoints */
-    for (const auto &uriHandler : dynamicEndpoints) {
+    for (const auto & [uri, callback] : dynamicEndpointCallbacks) {
+        httpd_uri_t uriHandler = {
+            .uri=uri.c_str(), 
+            .method=HTTP_GET, 
+            .handler=handleDynamicEndpoint, 
+            .user_ctx=this
+        };
         esp_err_t err = httpd_register_uri_handler(server, &uriHandler);
         if(err) {
-            LOGE("Failed to register URI handler for '%s' with code: '%d'", uriHandler.uri, err);
+            LOGE("Failed to register URI GET handler for '%s' with code: '%d'", uri.c_str(), err);
+        }
+
+        uriHandler.method = HTTP_POST;
+        err = httpd_register_uri_handler(server, &uriHandler);
+        if(err) {
+            LOGE("Failed to register URI POST handler for '%s' with code: '%d'", uri.c_str(), err);
         }
     }
 
@@ -73,7 +69,7 @@ void HttpServer::stop(){
     }
 }
 
-esp_err_t HttpServer::cbk_handle_static_get(httpd_req_t *req)
+esp_err_t HttpServer::handleStaticEndpoint(httpd_req_t *req)
 {
     HttpServer *httpServer = (HttpServer *)req->user_ctx;
     const StaticEndpoint &endpoint = httpServer->staticEndpoints.at(req->uri);
@@ -82,18 +78,9 @@ esp_err_t HttpServer::cbk_handle_static_get(httpd_req_t *req)
     return ESP_OK;
 }
 
-esp_err_t HttpServer::cbk_handle_get_script(httpd_req_t *req)
+esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
 {
     HttpServer *httpServer = (HttpServer *)req->user_ctx;
-    (void)httpServer; // Avoid unused variable warning
-    LOGI("HTTP request received: GET /script");
-    return ESP_FAIL;
-}
-
-esp_err_t HttpServer::cbk_handle_post_script(httpd_req_t *req)
-{
-    HttpServer *httpServer = (HttpServer *)req->user_ctx;
-    (void)httpServer; // Avoid unused variable warning
     LOGI("HTTP request received: POST /script");
 
     int ret, remaining = req->content_len;
@@ -113,43 +100,21 @@ esp_err_t HttpServer::cbk_handle_post_script(httpd_req_t *req)
 
     LOGD("Request buffer content: '%s'", reqBuf.get());
 
-    /* Send response */
-    httpd_resp_sendstr(req, "OK");
-    return ESP_OK;
-}
-
-esp_err_t HttpServer::cbk_handle_get_config(httpd_req_t *req)
-{
-    HttpServer *httpServer = (HttpServer *)req->user_ctx;
-    (void)httpServer; // Avoid unused variable warning
-    LOGI("HTTP request received: GET /config");
-    return ESP_FAIL;
-}
-
-esp_err_t HttpServer::cbk_handle_post_config(httpd_req_t *req)
-{
-    HttpServer *httpServer = (HttpServer *)req->user_ctx;
-    (void)httpServer; // Avoid unused variable warning
-    LOGI("HTTP request received: POST /config");
-
-    int ret, remaining = req->content_len;
-    std::unique_ptr<char[]> reqBuf = std::make_unique<char[]>(req->content_len + 1); // Reserve additional byte to ensure null-termination
-    reqBuf[remaining] = '\0'; // Null-terminate the buffer
-
-    while (remaining > 0) {
-        /* Read the data for the request */
-        if ((ret = httpd_req_recv(req, reqBuf.get(), remaining)) <= 0) {
-            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-                continue;
-            }
+    /* Call the dynamic endpoint callback */
+    auto it = httpServer->dynamicEndpointCallbacks.find(req->uri);
+    if(it != httpServer->dynamicEndpointCallbacks.end()) {
+        auto callback = it->second;
+        std::string response{};
+        ErrorCode err = callback(reqBuf.get(), response);
+        if(err != ErrorCode::Success) {
+            LOGE("Failed to handle dynamic endpoint '%s' with error: %d", req->uri, err);
             return ESP_FAIL;
         }
-        remaining -= ret;
+        
+        if(!response.empty()) {
+            httpd_resp_sendstr(req, response.c_str());
+        } 
     }
 
-    LOGD("Request buffer content: '%s'", reqBuf.get());
-
-    /* Send response */
-    httpd_resp_sendstr(req, "OK");
     return ESP_OK;
 }
