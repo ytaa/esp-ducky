@@ -15,6 +15,7 @@ public:
     struct StaticEndpoint {
         const char *respBuf;
         size_t respLen;
+        const std::string_view mime;
     };
 
     explicit HttpServer(std::unordered_map<std::string, StaticEndpoint> &&staticEndpoints, 

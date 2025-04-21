@@ -1,0 +1,15 @@
+#pragma once
+
+extern char _binary_C__w_esp_ducky_main_web_index_html_start;
+extern char _binary_C__w_esp_ducky_main_web_index_html_end;
+extern char _binary_C__w_esp_ducky_main_web_script_js_start;
+extern char _binary_C__w_esp_ducky_main_web_script_js_end;
+extern char _binary_C__w_esp_ducky_main_web_style_css_start;
+extern char _binary_C__w_esp_ducky_main_web_style_css_end;
+
+#define STATIC_WEB_INDEX_HTML_DATA ((const char*)&_binary_C__w_esp_ducky_main_web_index_html_start)
+#define STATIC_WEB_INDEX_HTML_SIZE ((size_t)(&_binary_C__w_esp_ducky_main_web_index_html_end - &_binary_C__w_esp_ducky_main_web_index_html_start))
+#define STATIC_WEB_SCRIPT_JS_DATA ((const char*)&_binary_C__w_esp_ducky_main_web_script_js_start)
+#define STATIC_WEB_SCRIPT_JS_SIZE ((size_t)(&_binary_C__w_esp_ducky_main_web_script_js_end - &_binary_C__w_esp_ducky_main_web_script_js_start))
+#define STATIC_WEB_STYLE_CSS_DATA ((const char*)&_binary_C__w_esp_ducky_main_web_style_css_start)
+#define STATIC_WEB_STYLE_CSS_SIZE ((size_t)(&_binary_C__w_esp_ducky_main_web_style_css_end - &_binary_C__w_esp_ducky_main_web_style_css_start))

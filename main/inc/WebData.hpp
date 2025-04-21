@@ -1,6 +1,0 @@
-#pragma once
-
-extern char _binary_C__w_esp_ducky_main_web_index_html_start;
-extern char _binary_C__w_esp_ducky_main_web_index_html_end;
-extern char _binary_C__w_esp_ducky_main_web_script_js_start;
-extern char _binary_C__w_esp_ducky_main_web_script_js_end;

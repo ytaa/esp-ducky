@@ -11,7 +11,7 @@
 #include "EspDucky.hpp"
 #include "Logger.hpp"
 #include "Script.hpp"
-#include "WebData.hpp"
+#include "StaticWebData.hpp"
 
 #define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
 
@@ -20,15 +20,23 @@ ap("esp-ducky", "ducky123"),
 mdns("esp-ducky"), 
 http(std::unordered_map<std::string, HttpServer::StaticEndpoint>{
     {"/", {
-            .respBuf = (const char*)&_binary_C__w_esp_ducky_main_web_index_html_start, 
-            .respLen = (size_t)(&_binary_C__w_esp_ducky_main_web_index_html_end - &_binary_C__w_esp_ducky_main_web_index_html_start)
+            .respBuf = STATIC_WEB_INDEX_HTML_DATA, 
+            .respLen = STATIC_WEB_INDEX_HTML_SIZE,
+            .mime = "text/html"
         }
     },
     {"/script.js", {
-            .respBuf = (const char*)&_binary_C__w_esp_ducky_main_web_script_js_start, 
-            .respLen = (size_t)(&_binary_C__w_esp_ducky_main_web_script_js_end - &_binary_C__w_esp_ducky_main_web_script_js_start)
+            .respBuf = STATIC_WEB_SCRIPT_JS_DATA, 
+            .respLen = STATIC_WEB_SCRIPT_JS_SIZE,
+            .mime = "text/javascript"
         }
+    },
+    {"/style.css", {
+        .respBuf = STATIC_WEB_STYLE_CSS_DATA, 
+        .respLen = STATIC_WEB_STYLE_CSS_SIZE,
+        .mime = "text/css"
     }
+}
 },std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>>{
     {"/script", [this](const std::string &request, std::string &response) {
             return handleScriptEndpoint(request, response);
@@ -103,7 +111,6 @@ void EspDucky::run() {
     }
 }
 
-
 ErrorCode EspDucky::handleScriptEndpoint(const std::string &request, std::string &response) {
     cJSON *reqJson = cJSON_Parse(request.data());
     if (!reqJson) {
@@ -111,24 +118,43 @@ ErrorCode EspDucky::handleScriptEndpoint(const std::string &request, std::string
         return ErrorCode::GeneralError;
     }
 
-    cJSON *script = cJSON_GetObjectItemCaseSensitive(reqJson, "script");
-    if (!cJSON_IsString(script) || (script->valuestring == NULL)) {
+    cJSON *scriptJson = cJSON_GetObjectItemCaseSensitive(reqJson, "script");
+    if (!cJSON_IsString(scriptJson) || (scriptJson->valuestring == NULL)) {
         LOGE("Invalid JSON format: 'script' is not a string");
         cJSON_Delete(reqJson);
         return ErrorCode::GeneralError;
     }
 
-    cJSON *action = cJSON_GetObjectItemCaseSensitive(reqJson, "action");
-    if (!cJSON_IsNumber(action)) {
+    cJSON *actionJson = cJSON_GetObjectItemCaseSensitive(reqJson, "action");
+    if (!cJSON_IsNumber(actionJson)) {
         LOGE("Invalid JSON format: 'action' is not a number");
         cJSON_Delete(reqJson);
         return ErrorCode::GeneralError;
     }
 
-    LOGD("Parsed script: '%s'", script->valuestring);
-    LOGD("Parsed action: '%d'", action->valueint);
+    LOGD("Parsed script: '%s'", scriptJson->valuestring);
+    LOGD("Parsed action: '%d'", actionJson->valueint);
 
-    cJSON_Delete(reqJson);
+    auto script = Script::parse(scriptJson->valuestring);
+    cJSON_Delete(reqJson); // Free the request json object
+
+    LOGD("Script parsing successful");
+
+    if (!script) {
+        LOGE("Failed to parse script: %s", scriptJson->valuestring);
+        return ErrorCode::GeneralError;
+    }
+
+    if(usb.isMounted()) {
+        if (script->run(usb) != ErrorCode::Success) {
+            LOGE("Failed to run script: %s", scriptJson->valuestring);
+            return ErrorCode::GeneralError;
+        }
+    }
+    else
+    {
+        LOGW("USB device not mounted. Skipping script execution.");
+    }
 
     // Prepare response
     cJSON *respJson = cJSON_CreateObject();
@@ -136,6 +162,7 @@ ErrorCode EspDucky::handleScriptEndpoint(const std::string &request, std::string
         LOGE("Failed to create JSON response object");
         return ErrorCode::GeneralError;
     }
+
     cJSON_AddStringToObject(respJson, "status", "success");
 
     char *respJsonStr = cJSON_PrintUnformatted(respJson);

@@ -14,6 +14,8 @@ ErrorCode HttpServer::start(){
     /* Generate default configuration */
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
+    config.stack_size = 1u<<15u; // Increase stack size to 8KB to handle script execution in the task context
+
     /* Empty handle to esp_http_server */
     server = NULL;
 
@@ -73,7 +75,7 @@ esp_err_t HttpServer::handleStaticEndpoint(httpd_req_t *req)
 {
     HttpServer *httpServer = (HttpServer *)req->user_ctx;
     const StaticEndpoint &endpoint = httpServer->staticEndpoints.at(req->uri);
-    //httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_type(req, endpoint.mime.data());
     httpd_resp_send(req, endpoint.respBuf, endpoint.respLen);
     return ESP_OK;
 }
@@ -112,6 +114,7 @@ esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
         }
         
         if(!response.empty()) {
+            httpd_resp_set_type(req, "application/json");
             httpd_resp_sendstr(req, response.c_str());
         } 
     }

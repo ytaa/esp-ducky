@@ -1,22 +1,55 @@
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>esp-ducky</title>
-        <link rel="stylesheet" href="styles.css">
-        <script src="script.js"></script>
-    </head>
-    <body>
-        <header>
-            <h1>Welcome to esp-ducky</h1>
-        </header>
-        <main>
-            <section id="content">
-                <p>This is a test web application for esp-ducky.</p>
-            </section>
-        </main>
-        <footer>
-            <p>&copy; 2025 esp-ducky</p>
-        </footer>
-    </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>🦆 esp-ducky</title>
+	<link rel="stylesheet" href="style.css">
+	<script type="module" src="script.js"></script>
+</head>
+<body>
+	<header>
+		<h1><span class="logo">🔌 esp-ducky 🦆</span></h1>
+	</header>
+	<main>
+	<section>
+		<h2>Script Editor</h2>
+		<textarea id="scriptTextarea">GUI r
+DELAY 500
+STRING notepad.exe
+ENTER
+DELAY 1000
+CTRL n
+DELAY 50
+STRING Hello World!</textarea>
+		<div class="button-row">
+			<button id="scriptRunButton">Run</button>
+			<button id="scriptLoadButton">Load</button>
+			<button id="scriptSaveButton">Save</button>
+		</div>
+	</section>
+	<section>
+		<h2>Configuration Editor</h2>
+		<label for="armingState">Arming state:</label>
+		<select id="armingState">
+			<option value="unarmed" selected>unarmed</option>
+			<option value="armedSingle">armed (single run)</option>
+			<option value="armedPersistent">armed (persistent)</option>
+		</select>
+		<label for="deviceType">USB device type:</label>
+		<select id="deviceType">
+			<option value="disabled">disabled</option>
+			<option value="hid" selected>HID - Human Interface Device</option>
+			<option value="msd">MSD - Mass Storage Device</option>
+			<option value="hidMsd">HID + MSD</option>
+		</select>
+		<div class="button-row">
+		<button id="configSaveButton">Save</button>
+		</div>
+	</section>
+	</main>
+	<footer>
+		<p>&copy; 2025 esp-ducky · Tristan Dobrowolski · github.com/ytaa/esp-ducky</p>
+	</footer>
+</body>
 </html>

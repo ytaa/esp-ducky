@@ -1,5 +1,5 @@
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    set(WEB_FILES "index.html" "script.js")
+    set(WEB_FILES "index.html" "script.js" "style.css")
     foreach(file ${WEB_FILES})
         message("Creating target for web file: ${file}")
         set(file_obj "${CMAKE_CURRENT_BINARY_DIR}/${file}.obj")
