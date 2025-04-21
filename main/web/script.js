@@ -5,6 +5,8 @@ const scriptRunButton = document.getElementById('scriptRunButton');
 const scriptLoadButton = document.getElementById('scriptLoadButton');
 const scriptSaveButton = document.getElementById('scriptSaveButton');
 
+const themeToggle = document.getElementById("themeToggle");
+
 const SCRIPT_ACTION_RUN = 0;
 const SCRIPT_ACTION_SAVE = 1;
 
@@ -49,3 +51,31 @@ autoGrow(scriptTextarea);
 
 scriptRunButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_RUN));
 scriptSaveButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_SAVE));
+
+// Theme toggle functionality
+function setTheme(mode) {
+	document.body.classList.remove("light", "dark");
+	if (mode) document.body.classList.add(mode);
+	localStorage.setItem("theme", mode);
+	updateToggleLabel();
+}
+  
+function updateToggleLabel() {
+	const isDark = document.body.classList.contains("dark");
+	themeToggle.checked  = isDark ? true : false;
+}
+
+// Apply saved theme on load
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) {
+	setTheme(savedTheme);
+} else {
+	updateToggleLabel(); // default to system mode
+}
+
+themeToggle?.addEventListener("click", () => {
+	const isDark = document.body.classList.contains("dark");
+	setTheme(isDark ? "light" : "dark");
+});
+
+updateToggleLabel();
