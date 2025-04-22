@@ -13,7 +13,18 @@
 
 class Script
 {
+public:
+    // Public types ===
 
+    enum class Command : std::uint8_t {
+        StringWrite,
+        KeyStroke,
+        Delay
+    };
+                          
+    using CommandVector = std::vector<std::tuple<Command, std::any>>;
+
+private:
     // Constants ===
 
     constexpr static std::size_t EXPRESSIONS_NUM = 10u;
@@ -23,16 +34,9 @@ class Script
 
 
     // Types ===
-
-    enum class Command : std::uint8_t {
-        StringWrite,
-        KeyStroke,
-        Delay
-    };
-
     struct ExpressionHandler {
         std::string regexStr;
-        std::function<ErrorCode(std::smatch&, std::vector<std::tuple<Command, std::any>>&)> process;
+        std::function<ErrorCode(std::smatch&, CommandVector&)> process;
     };
     struct
      SpecialKey {
@@ -51,10 +55,10 @@ class Script
 
     // Non-static members ===
 
-    std::vector<std::tuple<Command, std::any>> actionList;
+    CommandVector commands;
 public:
-    Script(std::vector<std::tuple<Command, std::any>> &actionList);
-    Script(std::vector<std::tuple<Command, std::any>> &&actionList);
+    Script(CommandVector &commands);
+    Script(CommandVector &&commands);
     ~Script() = default;
 
     ErrorCode run(UsbDevice &usbDevice);

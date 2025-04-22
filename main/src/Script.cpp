@@ -58,7 +58,7 @@ std::array<Script::SpecialKey, Script::SPECIAL_KEY_NUM> Script::specialKeys = {{
 std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressionHandlers = {{
     { // EMPTY LINE
         R"(^( |\t)*?\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // Do nothing - empty line is ignored
             LOGD("=== Processing empty line ===");
             return ErrorCode::Success;
@@ -66,7 +66,7 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
     },
     { // REM
         R"(^( |\t)*?REM ([\s\S]*?)\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // Do nothing - comment is ignored
             LOGD("=== Processing REM expression ===");
             return ErrorCode::Success;
@@ -74,7 +74,7 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
     },
     { // REM_BLOCK
         R"(^( |\t)*?REM_BLOCK ([\s\S]*?)END_REM( |\t)*\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // Do nothing - comment is ignored
             LOGD("=== Processing REM_BLOCK expression ===");
             return ErrorCode::Success;
@@ -82,7 +82,7 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
     },
     { // STRING
         R"(^( |\t)*?STRING (([\S]| |\t)+?)\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match the string command and parameter without ignoring leading and trailing spaces
             // The parameter should be available in the match group with index 2
             LOGD("=== Processing STRING expression ===");
@@ -92,13 +92,13 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
             }
 
             LOGD("STRING parameter: '%s'", match[2u].str().c_str());
-            actionList.emplace_back(Script::Command::StringWrite, std::string(match[2u].str()));
+            commands.emplace_back(Script::Command::StringWrite, std::string(match[2u].str()));
             return ErrorCode::Success;
         }
     },
     { // STRINGLN
         R"(^( |\t)*?STRINGLN (([\S]| |\t)+?)\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match the stringln command and parameter without ignoring leading and trailing spaces
             // The parameter should be available in the match group with index 2
             LOGD("=== Processing STRINGLN expression ===");
@@ -108,14 +108,14 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
             }
 
             LOGD("STRINGLN parameter: '%s'", match[2u].str().c_str());
-            actionList.emplace_back(Script::Command::StringWrite, std::string(match[2u].str()));
-            actionList.emplace_back(Script::Command::KeyStroke, std::vector<uint8_t>{HID_KEY_ENTER});
+            commands.emplace_back(Script::Command::StringWrite, std::string(match[2u].str()));
+            commands.emplace_back(Script::Command::KeyStroke, std::vector<uint8_t>{HID_KEY_ENTER});
             return ErrorCode::Success;
         }
     },
     { // DELAY
         R"(^( |\t)*?DELAY (([1-9]+[0-9]*)|0)( |\t)*?\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match the delay command and parameter and ignore leading and trailing spaces
             // The parameter should be available in the match group with index 2
             LOGD("=== Processing DELAY expression ===");
@@ -125,13 +125,13 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
             }
 
             LOGD("DELAY parameter: '%s'", match[2u].str().c_str());
-            actionList.emplace_back(Script::Command::Delay, static_cast<uint32_t>(std::stoul(match[2u].str())));
+            commands.emplace_back(Script::Command::Delay, static_cast<uint32_t>(std::stoul(match[2u].str())));
             return ErrorCode::Success;
         }
     },
     { // KEYSTROKE - SINGLE KEY
         R"(^( |\t)*?([\S]+)( |\t)*?\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match a single key and ignore leading and trailing spaces
             // The key should be available in the match group with index 2
             LOGD("=== Processing single key expression ===");
@@ -154,14 +154,14 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
                 return ErrorCode::GeneralError;
             }
 
-            // Add the key code to the action list
-            actionList.emplace_back(Script::Command::KeyStroke, std::move(keyCodes));
+            // Add the key code to the command vector
+            commands.emplace_back(Script::Command::KeyStroke, std::move(keyCodes));
             return ErrorCode::Success;
         }
     },
     { // KEYSTROKE - MULTIPLE KEYS
         R"(^( |\t)*?(([\S]+ )+[\S]+)( |\t)*?\n)", 
-        [](std::smatch &match, std::vector<std::tuple<Script::Command, std::any>> &actionList) {
+        [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match a line containing multiple keys and ignore leading and trailing spaces
             // The keys should be available in the match group with index 2
             LOGD("=== Processing multiple keys expression ===");
@@ -201,8 +201,8 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
                 }
             }
 
-            // Add the key code to the action list
-            actionList.emplace_back(Script::Command::KeyStroke, std::move(keyCodes));
+            // Add the key code to the command vector
+            commands.emplace_back(Script::Command::KeyStroke, std::move(keyCodes));
             return ErrorCode::Success;
         }
     },
@@ -218,7 +218,7 @@ ErrorCode Script::parseAscii(const char chr, std::vector<uint8_t> &keyCodes) {
     }
     // Check if it is an uppercase letter
     if(asciiToKeycodeConvTable[chrIdx][0u]) {
-        // Check if the shift key is already in the list
+        // Check if the shift key is already in the vector
         if (std::find(keyCodes.begin(), keyCodes.end(), HID_KEY_SHIFT_LEFT) == keyCodes.end()) {
             // Add shift key code for uppercase
             keyCodes.push_back(HID_KEY_SHIFT_LEFT);
@@ -256,7 +256,7 @@ ErrorCode Script::parseKeyStroke(const std::string &keyName, std::vector<uint8_t
 }
 
 std::optional<Script> Script::parse(std::string input){
-    std::vector<std::tuple<Script::Command, std::any>> actionList{};
+    Script::CommandVector commands{};
 
     // Ensure there is a newline at the end of the input string
     if (input.back() != '\n') {
@@ -271,7 +271,7 @@ std::optional<Script> Script::parse(std::string input){
         for (const auto &handler : expressionHandlers) {
             if (std::regex_search(input, match, std::regex(handler.regexStr))) {
                 // Call the process function of the matched handler
-                auto errorCode = handler.process(match, actionList);
+                auto errorCode = handler.process(match, commands);
                 if (errorCode != ErrorCode::Success) {
                     return std::nullopt; // Parsing failed
                 }
@@ -289,23 +289,23 @@ std::optional<Script> Script::parse(std::string input){
         input = match.suffix().str();
     }
 
-    return Script(std::move(actionList));
+    return Script(std::move(commands));
 }
 
-Script::Script(std::vector<std::tuple<Script::Command, std::any>> &actionList)
-:actionList(actionList)
+Script::Script(Script::CommandVector &commands)
+:commands(commands)
 {}
 
 
-Script::Script(std::vector<std::tuple<Script::Command, std::any>> &&actionList)
-:actionList(std::move(actionList))
+Script::Script(Script::CommandVector &&commands)
+:commands(std::move(commands))
 {}
 
 ErrorCode Script::run(UsbDevice &usbDevice) {
-    for (const auto &action : actionList) {
-        switch (std::get<0>(action)) {
+    for (const auto &command : commands) {
+        switch (std::get<0>(command)) {
             case Command::StringWrite: {
-                const std::string &str = std::any_cast<std::string>(std::get<1>(action));
+                const std::string &str = std::any_cast<std::string>(std::get<1>(command));
                 for(const char &chr : str) {
                     std::vector<uint8_t> keyCodes{};
                     auto errorCode = Script::parseAscii(chr, keyCodes);
@@ -323,17 +323,17 @@ ErrorCode Script::run(UsbDevice &usbDevice) {
                 break;
             }
             case Command::KeyStroke: {
-                const std::vector<uint8_t> &keyCodes = std::any_cast<std::vector<uint8_t>>(std::get<1>(action));
+                const std::vector<uint8_t> &keyCodes = std::any_cast<std::vector<uint8_t>>(std::get<1>(command));
                 usbDevice.hidKeyStroke(keyCodes);
                 break;
             }
             case Command::Delay: {
-                uint32_t delay = std::any_cast<uint32_t>(std::get<1>(action));
+                uint32_t delay = std::any_cast<uint32_t>(std::get<1>(command));
                 vTaskDelay(delay / portTICK_PERIOD_MS);
                 break;
             }
             default:
-                LOGE("Unknown command in action list");
+                LOGE("Unknown command in command vector");
                 return ErrorCode::GeneralError;
         }
     }
