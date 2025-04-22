@@ -1,5 +1,5 @@
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    set(WEB_FILES "index.html" "script.js" "style.css")
+    set(WEB_FILES "index.html" "script.js" "style.css" "favicon.ico")
     foreach(file ${WEB_FILES})
         message("Creating target for web file: ${file}")
         set(file_obj "${CMAKE_CURRENT_BINARY_DIR}/${file}.obj")
@@ -10,7 +10,8 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
 
         add_custom_command(OUTPUT ${file_obj}
                             DEPENDS ${CMAKE_CURRENT_LIST_DIR}/web/${file}
-                            COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-xtensa-le --binary-architecture xtensa ${CMAKE_CURRENT_LIST_DIR}/web/${file} ${file_obj}
+                            WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/web
+                            COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-xtensa-le --binary-architecture xtensa ${file} ${file_obj}
                             COMMENT Coverts ${file} to object file)
     endforeach()
 endif()

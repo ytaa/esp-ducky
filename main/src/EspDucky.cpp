@@ -20,23 +20,29 @@ ap("esp-ducky", "ducky123"),
 mdns("esp-ducky"), 
 http(std::unordered_map<std::string, HttpServer::StaticEndpoint>{
     {"/", {
-            .respBuf = STATIC_WEB_INDEX_HTML_DATA, 
-            .respLen = STATIC_WEB_INDEX_HTML_SIZE,
+            .respBuf = STATIC_WEB_DATA_PTR(index_html), 
+            .respLen = STATIC_WEB_DATA_SIZE(index_html),
             .mime = "text/html"
         }
     },
     {"/script.js", {
-            .respBuf = STATIC_WEB_SCRIPT_JS_DATA, 
-            .respLen = STATIC_WEB_SCRIPT_JS_SIZE,
+            .respBuf = STATIC_WEB_DATA_PTR(script_js), 
+            .respLen = STATIC_WEB_DATA_SIZE(script_js),
             .mime = "text/javascript"
         }
     },
     {"/style.css", {
-        .respBuf = STATIC_WEB_STYLE_CSS_DATA, 
-        .respLen = STATIC_WEB_STYLE_CSS_SIZE,
+        .respBuf = STATIC_WEB_DATA_PTR(style_css), 
+        .respLen = STATIC_WEB_DATA_SIZE(style_css),
         .mime = "text/css"
-    }
-}
+        }
+    },
+    {"/favicon.ico", {
+        .respBuf = STATIC_WEB_DATA_PTR(favicon_ico), 
+        .respLen = STATIC_WEB_DATA_SIZE(favicon_ico),
+        .mime = "image/x-icon"
+        }
+    },
 },std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>>{
     {"/script", [this](const std::string &request, std::string &response) {
             return handleScriptEndpoint(request, response);
