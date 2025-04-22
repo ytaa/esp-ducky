@@ -7,3 +7,7 @@ enum class ErrorCode : std::uint8_t {
     GeneralError,
     InvalidArgument,
 };
+
+namespace Utils {
+    void delay(uint32_t ms);
+}

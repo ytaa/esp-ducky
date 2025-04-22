@@ -3,6 +3,7 @@
 #include <ctime>
 
 #include "Logger.hpp"
+#include "Utils.hpp"
 
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
@@ -24,6 +25,17 @@ Logger::Logger() : level(Logger::Level::Debug) {}
 Logger& Logger::get() {
     static Logger *instance = new Logger();
     return *instance;
+}
+
+void Logger::abort() {
+    // FLush the output buffer to ensure all logs are printed before aborting
+    fflush(stdout);
+
+    // Enter infinite loop to halt the program
+    while (true) {
+        // Delay added to avoid busy-waiting
+        Utils::delay(1000u); // 1 second delay
+    }
 }
 
 void Logger::log(Logger::Level level, const char *fmt, ...) {

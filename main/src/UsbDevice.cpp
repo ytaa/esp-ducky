@@ -129,9 +129,9 @@ void UsbDevice::hidSendKeyboardReport(const std::vector<uint8_t> &keysList, uint
 
 void UsbDevice::hidKeyStroke(const std::vector<uint8_t> &keysList, uint8_t modifier, uint32_t delay) {
     hidSendKeyboardReport(keysList, modifier);
-    vTaskDelay(delay / portTICK_PERIOD_MS);
+    Utils::delay(delay);
     (void)tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, NULL);
-    vTaskDelay(delay / portTICK_PERIOD_MS);
+    Utils::delay(delay);
 }
 
 UsbDevice* UsbDevice::getInstance(uint8_t instanceIdx)

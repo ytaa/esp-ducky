@@ -8,7 +8,7 @@
 #define LOGI(...) Logger::get().log(Logger::Level::Info, __VA_ARGS__)
 #define LOGW(...) Logger::get().log(Logger::Level::Warning, __VA_ARGS__)
 #define LOGE(...) Logger::get().log(Logger::Level::Error, __VA_ARGS__)
-#define LOGC(...) Logger::get().log(Logger::Level::Critical, __VA_ARGS__);fflush(stdout);abort()
+#define LOGC(...) Logger::get().log(Logger::Level::Critical, __VA_ARGS__);Logger::abort()
 
 class Logger {
 public:
@@ -26,6 +26,8 @@ public:
     Level level;
 
     static Logger& get();
+
+    static void abort();
 
     void log(Level level, const char *fmt, ...);
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "nvs_handle.hpp"
+
 #include "WiFiAccessPoint.hpp"
 #include "HttpServer.hpp"
 #include "MdnsResponder.hpp"
@@ -9,10 +11,36 @@
 class EspDucky
 {
 private:
+    enum class ArmingState : uint8_t
+    {
+        Unarmed,
+        SingleRun,
+        Persistent
+    };
+
+    enum class UsbDeviceType : uint8_t
+    {
+        SerialJtag,
+        Hid,
+        Msd,
+        HidMsd
+    };
+
+    struct NvConfig 
+    {
+        ArmingState armingState;
+        UsbDeviceType usbDeviceType;
+    };
+
+    NvConfig nvConfig;
     WiFiAccessPoint ap;
     MdnsResponder mdns;
     HttpServer http;
     UsbDevice usb;
+
+    void handleNvConfig(nvs::NVSHandle *handle);
+    void handleNvScript(nvs::NVSHandle *handle);
+
 public:
     EspDucky();
     ~EspDucky() = default;

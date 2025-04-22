@@ -1,7 +1,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "nvs.h"
 #include "nvs_flash.h"
+#include "nvs_handle.hpp"
 #include "mdns.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -15,7 +17,8 @@
 
 #define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
 
-EspDucky::EspDucky() : 
+EspDucky::EspDucky() :
+nvConfig(ArmingState::Unarmed, UsbDeviceType::Hid), 
 ap("esp-ducky", "ducky123"), 
 mdns("esp-ducky"), 
 http(std::unordered_map<std::string, HttpServer::StaticEndpoint>{
@@ -82,13 +85,141 @@ ErrorCode EspDucky::init() {
         LOGC("Failed to initialize NVS flash with error: %d. Aborting...", ret);
     }
 
+    // Open NVS handle
+    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle("esp-ducky", NVS_READWRITE, &ret);
+    if(ESP_OK != ret) {
+        LOGC("Failed to open NVS handle with error: (%s). Aborting...", esp_err_to_name(ret));
+    }
+
+    // Read and handle the nvConfig and nvScript from NVS
+    handleNvConfig(handle.get());
+    handleNvScript(handle.get());
 
     ap.start();
     mdns.start();
     http.start();
-    usb.start();
-
+    
     return ErrorCode::Success;
+}
+
+void EspDucky::handleNvConfig(nvs::NVSHandle *handle) {
+    if(!handle) {
+        LOGC("Failed to read the nvConfig - NVS handle is null. Aborting...");
+    }
+
+    // Read nvConfig from NVS
+    esp_err_t ret = handle->get_blob("nvConfig", &nvConfig, sizeof(nvConfig));
+    if(ESP_ERR_NVS_NOT_FOUND == ret)
+    {
+        LOGW("NVS data for nvConfig not found. Using default values.");
+    }
+    else if(ESP_OK != ret) {
+        LOGC("Failed to retrieve NVS data with error: (%s). Aborting...", esp_err_to_name(ret));
+    }
+
+    // Handle USB device configuration
+    switch(nvConfig.usbDeviceType) {
+        case UsbDeviceType::SerialJtag: {
+            LOGI("Starting USB Serial JTAG device...");
+            // No action needed, as the USB Serial JTAG device is started by default
+            break;
+        }
+        case UsbDeviceType::Hid: {
+            LOGI("Starting USB HID device...");
+            usb.start();
+            break;
+        }
+        case UsbDeviceType::Msd: {
+            LOGW("USB MSD device is not supported yet. Starting Serial JTAG device instead...");
+            // No action needed, as the USB Serial JTAG device is started by default
+            break;
+        }
+        case UsbDeviceType::HidMsd: {
+            LOGW("USB MSD device is not supported yet. Starting only HID device instead...");
+            usb.start();
+            break;
+        }
+        default: {
+            LOGC("Invalid USB device type in nvConfig data. Aborting...");
+        }
+    }
+}
+
+void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
+    if(nvConfig.armingState == ArmingState::Unarmed) {
+        LOGI("Device is unarmed. No script is executed at startup.");
+        return;
+    }
+
+    if(UsbDeviceType::Hid != nvConfig.usbDeviceType && UsbDeviceType::HidMsd != nvConfig.usbDeviceType) {
+        LOGW("Device is not in HID mode. Script execution is not possible.");
+        return;
+    }
+
+    LOGI("Device is armed with HID enabled. Reading script from NVS...");
+    
+    // Read script size from NVS
+    uint32_t nvScriptSize = 0u;
+    std::unique_ptr<uint8_t[]> nvScriptData{nullptr};
+
+    esp_err_t ret = handle->get_item("nvScriptSize", nvScriptSize);
+    if(ESP_OK == ret)
+    {
+        // Read script data from NVS
+        nvScriptData = std::make_unique<uint8_t[]>(nvScriptSize);
+        ret = handle->get_blob("nvScriptData", nvScriptData.get(), nvScriptSize);
+    }
+
+    // Check if script size and data was found in the NVS
+    if(ESP_ERR_NVS_NOT_FOUND == ret) {
+        LOGW("Device is armed but no script was stored in the NVS. The armed state is ignored.");
+    }
+    else if(ESP_OK != ret)
+    {
+        LOGC("Failed to retrieve script from NVS with error: (%s). Aborting...", esp_err_to_name(ret));
+    }
+    else {
+        // Parse the script
+        auto nvScript = Script::deserialize(std::span<const uint8_t>(nvScriptData.get(), nvScriptSize));
+        if (!nvScript) {
+            LOGE("Failed to deserialize script from NVS. The armed state is ignored.");
+            return;
+        }
+        else {
+            if(!usb.isMounted()) {
+                LOGW("USB device not mounted during startup. The armed state is ignored.");
+                return;
+            }
+
+            // Run the script
+            if (ErrorCode::Success != nvScript->run(usb)) {
+                LOGE("Failed to run script from NVS. The armed state is ignored.");
+                return;
+            }
+
+            LOGI("Script from NVS executed successfully.");
+
+            // Handle single run armed state
+            if(ArmingState::Persistent == nvConfig.armingState) {
+                LOGI("Device is armed in persistent mode. The armed state is not reset.");
+                return;
+            }
+
+            // Reset the armed state to unarmed
+            nvConfig.armingState = ArmingState::Unarmed;
+            ret = handle->set_blob("nvConfig", &nvConfig, sizeof(nvConfig));
+            if(ESP_OK != ret) {
+                LOGC("Failed to update NVS data with error: (%s). Aborting...", esp_err_to_name(ret));
+            }
+
+            ret = handle->commit();
+            if(ESP_OK != ret) {
+                LOGC("Failed to commit NVS data with error: (%s). Aborting...", esp_err_to_name(ret));
+            }
+            
+            LOGI("Device is unarmed after script execution.");
+        }
+    }
 }
 
 void EspDucky::run() {
@@ -113,7 +244,7 @@ void EspDucky::run() {
                 usbDeviceDisableCountdown = 3;
             }
         }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        Utils::delay(1000);
     }
 }
 

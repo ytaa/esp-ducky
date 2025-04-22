@@ -7,6 +7,7 @@
 #include <regex>
 #include <functional>
 #include <optional>
+#include <span>
 
 #include "UsbDevice.hpp"
 #include "Utils.hpp"
@@ -64,4 +65,5 @@ public:
     ErrorCode run(UsbDevice &usbDevice);
 
     static std::optional<Script> parse(std::string input);
+    static std::optional<Script> deserialize(std::span<const uint8_t> input);
 };

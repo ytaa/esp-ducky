@@ -292,6 +292,11 @@ std::optional<Script> Script::parse(std::string input){
     return Script(std::move(commands));
 }
 
+std::optional<Script> Script::deserialize(std::span<const uint8_t> input) {
+    (void)input;
+    return std::nullopt; // TODO: Implement deserialization logic
+}
+
 Script::Script(Script::CommandVector &commands)
 :commands(commands)
 {}
@@ -329,7 +334,7 @@ ErrorCode Script::run(UsbDevice &usbDevice) {
             }
             case Command::Delay: {
                 uint32_t delay = std::any_cast<uint32_t>(std::get<1>(command));
-                vTaskDelay(delay / portTICK_PERIOD_MS);
+                Utils::delay(delay);
                 break;
             }
             default:
