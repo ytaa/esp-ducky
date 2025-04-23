@@ -6,6 +6,7 @@ enum class ErrorCode : std::uint8_t {
     Success,
     GeneralError,
     InvalidArgument,
+    NotImplemented,
 };
 
 namespace Utils {

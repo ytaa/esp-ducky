@@ -4,6 +4,9 @@ const scriptTextarea = document.getElementById('scriptTextarea');
 const scriptRunButton = document.getElementById('scriptRunButton');
 const scriptLoadButton = document.getElementById('scriptLoadButton');
 const scriptSaveButton = document.getElementById('scriptSaveButton');
+const armingStateSelect = document.getElementById('armingStateSelect');
+const usbDeviceTypeSelect = document.getElementById('usbDeviceTypeSelect');
+const configSaveButton = document.getElementById('configSaveButton');
 
 const themeToggle = document.getElementById("themeToggle");
 
@@ -41,6 +44,63 @@ function postScript(script, action) {
 	xhr.send(JSON.stringify(scriptReq));
 }
 
+function getConfig() {
+	console.log("Sending GET /config endpoint");
+
+	// unregister subscription from the server
+	let xhr = new XMLHttpRequest();
+	xhr.open("GET", "config", true);
+
+	xhr.onreadystatechange = function () {
+		if (xhr.readyState === 4) {
+			if(xhr.status === 200)
+			{
+				var json = JSON.parse(xhr.responseText);
+				console.log("GET /config endpoint response: " + xhr.responseText);
+				armingStateSelect.value = json.armingState;
+				usbDeviceTypeSelect.value = json.usbDeviceType;
+			}
+			else
+			{
+				console.error("GET /config endpoint error: " + xhr.statusText);
+			}
+		}
+	};
+
+	xhr.send();
+}
+
+function postConfig() {
+	console.log("Sending POST /config endpoint");
+
+	// unregister subscription from the server
+	let xhr = new XMLHttpRequest();
+	xhr.open("POST", "config", true);
+	xhr.setRequestHeader("Content-Type", "application/json");
+
+	let configReq = {
+		"armingState": parseInt(armingStateSelect.value),
+		"usbDeviceType": parseInt(usbDeviceTypeSelect.value),
+	};
+
+	xhr.onreadystatechange = function () {
+		if (xhr.readyState === 4) {
+			if(xhr.status === 200)
+			{
+				//var json = JSON.parse(xhr.responseText);
+				//console.log(xhr.responseText);
+				console.log("POST /config endpoint response: " + xhr.responseText);
+			}
+			else
+			{
+				console.error("POST /config endpoint error: " + xhr.statusText);
+			}
+		}
+	};
+
+	xhr.send(JSON.stringify(configReq));
+}
+
 function autoGrow(element) {
 	element.style.height = 'auto';
 	element.style.height = element.scrollHeight + 'px';
@@ -51,6 +111,7 @@ autoGrow(scriptTextarea);
 
 scriptRunButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_RUN));
 scriptSaveButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_SAVE));
+configSaveButton.addEventListener('click', () => postConfig());
 
 // Theme toggle functionality
 function setTheme(mode) {
@@ -79,3 +140,4 @@ themeToggle?.addEventListener("click", () => {
 });
 
 updateToggleLabel();
+getConfig();

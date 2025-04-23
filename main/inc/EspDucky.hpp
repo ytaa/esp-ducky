@@ -48,5 +48,11 @@ public:
     ErrorCode init();
     void run();
 
-    ErrorCode handleScriptEndpoint(const std::string &request, std::string &response);
+    ErrorCode handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
+    
+    ErrorCode handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
 };

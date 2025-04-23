@@ -30,18 +30,18 @@ STRING Hello World!</textarea>
 	</section>
 	<section>
 		<h2>Configuration Editor</h2>
-		<label for="armingState">Arming state:</label>
-		<select id="armingState">
-			<option value="unarmed" selected>unarmed</option>
-			<option value="armedSingle">armed (single run)</option>
-			<option value="armedPersistent">armed (persistent)</option>
+		<label for="armingStateSelect">Arming state:</label>
+		<select id="armingStateSelect">
+			<option value="0" selected>unarmed</option>
+			<option value="1">armed (single run)</option>
+			<option value="2">armed (persistent)</option>
 		</select>
-		<label for="deviceType">USB device type:</label>
-		<select id="deviceType">
-			<option value="disabled">disabled</option>
-			<option value="hid" selected>HID - Human Interface Device</option>
-			<option value="msd">MSD - Mass Storage Device</option>
-			<option value="hidMsd">HID + MSD</option>
+		<label for="usbDeviceTypeSelect">USB device type:</label>
+		<select id="usbDeviceTypeSelect">
+			<option value="0" selected>Serial JTAG</option>
+			<option value="1">HID - Human Interface Device</option>
+			<option value="2">MSD - Mass Storage Device</option>
+			<option value="3">HID + MSD</option>
 		</select>
 		<div class="button-row">
 		<button id="configSaveButton">Save</button>

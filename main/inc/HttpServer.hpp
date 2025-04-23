@@ -12,14 +12,21 @@
 
 class HttpServer {
 public:
+
+    using EndpointCallback = std::function<ErrorCode(httpd_req_t &, const std::string&, std::string&)>;
     struct StaticEndpoint {
         const char *respBuf;
         size_t respLen;
         const std::string_view mime;
     };
 
+    struct DynamicEndpoint {
+        EndpointCallback callback;
+        const std::string_view mime;
+    };
+
     explicit HttpServer(std::unordered_map<std::string, StaticEndpoint> &&staticEndpoints, 
-        std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>> &&dynamicEndpointCallbacks);
+        std::unordered_map<std::string, DynamicEndpoint> &&dynamicEndpoints);
     ~HttpServer() = default;
 
     ErrorCode start();
@@ -31,5 +38,5 @@ public:
 private:
     httpd_handle_t server;
     const std::unordered_map<std::string, StaticEndpoint> staticEndpoints;
-    const std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>> dynamicEndpointCallbacks;
+    const std::unordered_map<std::string, DynamicEndpoint> dynamicEndpoints;
 };

@@ -4,10 +4,10 @@
 #include "Logger.hpp"
 
 HttpServer::HttpServer(std::unordered_map<std::string, StaticEndpoint> &&staticEndpoints, 
-    std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>> &&dynamicEndpointCallbacks): 
+    std::unordered_map<std::string, DynamicEndpoint> &&dynamicEndpoints): 
 server(NULL), 
 staticEndpoints(std::move(staticEndpoints)),
-dynamicEndpointCallbacks(std::move(dynamicEndpointCallbacks))
+dynamicEndpoints(std::move(dynamicEndpoints))
 {}
 
 ErrorCode HttpServer::start(){
@@ -40,7 +40,7 @@ ErrorCode HttpServer::start(){
     }
 
     /* Register URI handlers for dynamic endpoints */
-    for (const auto & [uri, callback] : dynamicEndpointCallbacks) {
+    for (const auto & [uri, endpoint] : dynamicEndpoints) {
         httpd_uri_t uriHandler = {
             .uri=uri.c_str(), 
             .method=HTTP_GET, 
@@ -49,7 +49,7 @@ ErrorCode HttpServer::start(){
         };
         esp_err_t err = httpd_register_uri_handler(server, &uriHandler);
         if(err) {
-            LOGE("Failed to register URI GET handler for '%s' with code: '%d'", uri.c_str(), err);
+            LOGE("Failed to register URI GET handler for '%s' with code: '%d'", err);
         }
 
         uriHandler.method = HTTP_POST;
@@ -73,7 +73,14 @@ void HttpServer::stop(){
 
 esp_err_t HttpServer::handleStaticEndpoint(httpd_req_t *req)
 {
-    HttpServer *httpServer = (HttpServer *)req->user_ctx;
+    if(!req || !req->user_ctx) {
+        LOGE("Received null request in static endpoint handler");
+        return ESP_FAIL;
+    }
+
+    LOGI("HTTP request received for static endpoint %s", req->uri);
+
+    HttpServer *httpServer = static_cast<HttpServer *>(req->user_ctx);
     const StaticEndpoint &endpoint = httpServer->staticEndpoints.at(req->uri);
     httpd_resp_set_type(req, endpoint.mime.data());
     httpd_resp_send(req, endpoint.respBuf, endpoint.respLen);
@@ -82,9 +89,14 @@ esp_err_t HttpServer::handleStaticEndpoint(httpd_req_t *req)
 
 esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
 {
-    HttpServer *httpServer = (HttpServer *)req->user_ctx;
-    LOGI("HTTP request received: POST /script");
+    if(!req || !req->user_ctx) {
+        LOGE("Received null request in dynamic endpoint handler");
+        return ESP_FAIL;
+    }
 
+    LOGI("HTTP request received for dynamic endpoint %s", req->uri);
+
+    HttpServer *httpServer = static_cast<HttpServer *>(req->user_ctx);
     int ret, remaining = req->content_len;
     std::unique_ptr<char[]> reqBuf = std::make_unique<char[]>(req->content_len + 1); // Reserve additional byte to ensure null-termination
     reqBuf[remaining] = '\0'; // Null-terminate the buffer
@@ -103,18 +115,18 @@ esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
     LOGD("Request buffer content: '%s'", reqBuf.get());
 
     /* Call the dynamic endpoint callback */
-    auto it = httpServer->dynamicEndpointCallbacks.find(req->uri);
-    if(it != httpServer->dynamicEndpointCallbacks.end()) {
-        auto callback = it->second;
+    auto it = httpServer->dynamicEndpoints.find(req->uri);
+    if(it != httpServer->dynamicEndpoints.end()) {
+        auto endpoint = it->second;
         std::string response{};
-        ErrorCode err = callback(reqBuf.get(), response);
+        ErrorCode err = endpoint.callback(*req, reqBuf.get(), response);
         if(err != ErrorCode::Success) {
             LOGE("Failed to handle dynamic endpoint '%s' with error: %d", req->uri, err);
             return ESP_FAIL;
         }
         
         if(!response.empty()) {
-            httpd_resp_set_type(req, "application/json");
+            httpd_resp_set_type(req, endpoint.mime.data());
             httpd_resp_sendstr(req, response.c_str());
         } 
     }

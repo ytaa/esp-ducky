@@ -35,23 +35,32 @@ http(std::unordered_map<std::string, HttpServer::StaticEndpoint>{
         }
     },
     {"/style.css", {
-        .respBuf = STATIC_WEB_DATA_PTR(style_css), 
-        .respLen = STATIC_WEB_DATA_SIZE(style_css),
-        .mime = "text/css"
+            .respBuf = STATIC_WEB_DATA_PTR(style_css), 
+            .respLen = STATIC_WEB_DATA_SIZE(style_css),
+            .mime = "text/css"
         }
     },
     {"/favicon.ico", {
-        .respBuf = STATIC_WEB_DATA_PTR(favicon_ico), 
-        .respLen = STATIC_WEB_DATA_SIZE(favicon_ico),
-        .mime = "image/x-icon"
+            .respBuf = STATIC_WEB_DATA_PTR(favicon_ico), 
+            .respLen = STATIC_WEB_DATA_SIZE(favicon_ico),
+            .mime = "image/x-icon"
         }
     },
-},std::unordered_map<std::string, std::function<ErrorCode(const std::string&, std::string&)>>{
-    {"/script", [this](const std::string &request, std::string &response) {
-            return handleScriptEndpoint(request, response);
+},std::unordered_map<std::string, HttpServer::DynamicEndpoint>{
+    {"/script", {
+            .callback = [this](httpd_req_t &http, const std::string &request, std::string &response) {
+                return handleScriptEndpoint(http, request, response);
+            },
+            .mime = "application/json"
         }
     },
-    {"/config", nullptr}
+    {"/config", {
+        .callback = [this](httpd_req_t &http, const std::string &request, std::string &response) {
+            return handleConfigEndpoint(http, request, response);
+        },
+        .mime = "application/json"
+    }
+}
 }), 
 usb() {}
 
@@ -217,7 +226,7 @@ void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
                 LOGC("Failed to commit NVS data with error: (%s). Aborting...", esp_err_to_name(ret));
             }
             
-            LOGI("Device is unarmed after script execution.");
+            LOGI("Device is unarmed after script execution. Config stored in NVS.");
         }
     }
 }
@@ -248,25 +257,45 @@ void EspDucky::run() {
     }
 }
 
-ErrorCode EspDucky::handleScriptEndpoint(const std::string &request, std::string &response) {
-    cJSON *reqJson = cJSON_Parse(request.data());
+ErrorCode EspDucky::handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response) {
+    switch(http.method) {
+        case HTTP_GET: {
+            return handleScriptEndpointGet(http, request, response);
+        }
+        case HTTP_POST: {
+            return handleScriptEndpointPost(http, request, response);
+        }
+        default: {
+            LOGE("Unsupported HTTP method: %d", http.method);
+        }
+    }
+
+    return ErrorCode::InvalidArgument;
+}
+
+ErrorCode EspDucky::handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response) {
+    return ErrorCode::NotImplemented;
+}
+
+ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response) {
+    cJSON *reqJson = cJSON_Parse(request.c_str());
     if (!reqJson) {
         LOGE("Failed to parse JSON: %s", cJSON_GetErrorPtr());
-        return ErrorCode::GeneralError;
+        return ErrorCode::InvalidArgument;
     }
 
     cJSON *scriptJson = cJSON_GetObjectItemCaseSensitive(reqJson, "script");
     if (!cJSON_IsString(scriptJson) || (scriptJson->valuestring == NULL)) {
         LOGE("Invalid JSON format: 'script' is not a string");
         cJSON_Delete(reqJson);
-        return ErrorCode::GeneralError;
+        return ErrorCode::InvalidArgument;
     }
 
     cJSON *actionJson = cJSON_GetObjectItemCaseSensitive(reqJson, "action");
     if (!cJSON_IsNumber(actionJson)) {
         LOGE("Invalid JSON format: 'action' is not a number");
         cJSON_Delete(reqJson);
-        return ErrorCode::GeneralError;
+        return ErrorCode::InvalidArgument;
     }
 
     LOGD("Parsed script: '%s'", scriptJson->valuestring);
@@ -303,10 +332,134 @@ ErrorCode EspDucky::handleScriptEndpoint(const std::string &request, std::string
     cJSON_AddStringToObject(respJson, "status", "success");
 
     char *respJsonStr = cJSON_PrintUnformatted(respJson);
+    if (!respJsonStr) {
+        LOGE("Failed to create JSON string from response object");
+        cJSON_Delete(respJson); // Free the response json object
+        return ErrorCode::GeneralError;
+    }
+
     response = respJsonStr;
 
     std::free(respJsonStr); // Free the JSON string
     cJSON_Delete(respJson); // Free the response json object
 
     return ErrorCode::Success;    
+}
+
+ErrorCode EspDucky::handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response) {
+    switch(http.method) {
+        case HTTP_GET: {
+            return handleConfigEndpointGet(http, request, response);
+        }
+        case HTTP_POST: {
+            return handleConfigEndpointPost(http, request, response);
+        }
+        default: {
+            LOGE("Unsupported HTTP method: %d", http.method);
+        }
+    }
+
+    return ErrorCode::InvalidArgument;
+}
+
+ErrorCode EspDucky::handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response) {
+    cJSON *respJson = cJSON_CreateObject();
+    if (!respJson) {
+        LOGE("Failed to create JSON response object");
+        return ErrorCode::GeneralError;
+    }
+
+    // Ignore return value - the functions return pointer to the root object
+    (void)cJSON_AddNumberToObject(respJson, "armingState", static_cast<int>(nvConfig.armingState));
+    (void)cJSON_AddNumberToObject(respJson, "usbDeviceType", static_cast<int>(nvConfig.usbDeviceType));
+
+    char *respJsonStr = cJSON_PrintUnformatted(respJson);
+    if( !respJsonStr) {
+        LOGE("Failed to create JSON string from response object");
+        cJSON_Delete(respJson); // Free the response json object
+        return ErrorCode::GeneralError;
+    }
+
+    response = respJsonStr;
+
+    std::free(respJsonStr); // Free the JSON string
+    cJSON_Delete(respJson); // Free the response json object
+
+    return ErrorCode::Success;
+}
+
+ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response) {
+    cJSON *reqJson = cJSON_Parse(request.c_str());
+    if (!reqJson) {
+        LOGE("Failed to parse JSON: %s", cJSON_GetErrorPtr());
+        return ErrorCode::InvalidArgument;
+    }
+
+    cJSON *armingStateJson = cJSON_GetObjectItemCaseSensitive(reqJson, "armingState");
+    if (!cJSON_IsNumber(armingStateJson)) {
+        LOGE("Invalid JSON format: 'armingState' is not a number");
+        cJSON_Delete(reqJson);
+        return ErrorCode::InvalidArgument;
+    }
+
+    cJSON *usbDeviceTypeJson = cJSON_GetObjectItemCaseSensitive(reqJson, "usbDeviceType");
+    if (!cJSON_IsNumber(usbDeviceTypeJson)) {
+        LOGE("Invalid JSON format: 'usbDeviceType' is not a number");
+        cJSON_Delete(reqJson);
+        return ErrorCode::InvalidArgument;
+    }
+
+    LOGD("Parsed armingState: '%d'", armingStateJson->valueint);
+    LOGD("Parsed usbDeviceType: '%d'", usbDeviceTypeJson->valueint);
+
+    nvConfig.armingState = static_cast<ArmingState>(armingStateJson->valueint);
+    nvConfig.usbDeviceType = static_cast<UsbDeviceType>(usbDeviceTypeJson->valueint);
+
+    cJSON_Delete(reqJson); // Free the request json object
+
+    // Open NVS handle
+    esp_err_t ret = 0;
+    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle("esp-ducky", NVS_READWRITE, &ret);
+    if(ESP_OK != ret) {
+        LOGE("Failed to open NVS handle with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+    
+    // Write nvConfig to NVS
+    ret = handle->set_blob("nvConfig", &nvConfig, sizeof(nvConfig));
+    if(ESP_OK != ret) {
+        LOGE("Failed to update NVS data with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+
+    ret = handle->commit();
+    if(ESP_OK != ret) {
+        LOGE("Failed to commit NVS data with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+
+    LOGI("New configuration successfully stored in NVS");
+
+    // Prepare response
+    cJSON *respJson = cJSON_CreateObject();
+    if (!respJson) {
+        LOGE("Failed to create JSON response object");
+        return ErrorCode::GeneralError;
+    }
+
+    cJSON_AddStringToObject(respJson, "status", "success");
+
+    char *respJsonStr = cJSON_PrintUnformatted(respJson);
+    if (!respJsonStr) {
+        LOGE("Failed to create JSON string from response object");
+        cJSON_Delete(respJson); // Free the response json object
+        return ErrorCode::GeneralError;
+    }
+
+    response = respJsonStr;
+
+    std::free(respJsonStr); // Free the JSON string
+    cJSON_Delete(respJson); // Free the response json object
+
+    return ErrorCode::Success;
 }
