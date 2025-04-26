@@ -3,7 +3,9 @@
 #include "Script.hpp"
 #include "Logger.hpp"
 
-const uint8_t Script::asciiToKeycodeConvTable[ASCII_CHAR_NUM][ASCII_CONV_TABLE_DIM_NUM] =  { HID_ASCII_TO_KEYCODE }; 
+const uint8_t Script::asciiToKeycodeConvTable[ASCII_CHAR_NUM][ASCII_CONV_TABLE_DIM_NUM] = { HID_ASCII_TO_KEYCODE };
+const uint8_t Script::keycodeToAsciiConvTable[ASCII_CHAR_NUM][ASCII_CONV_TABLE_DIM_NUM] = { HID_KEYCODE_TO_ASCII };
+
 
 std::array<Script::SpecialKey, Script::SPECIAL_KEY_NUM> Script::specialKeys = {{
     {"UP", HID_KEY_ARROW_UP},//
@@ -255,6 +257,74 @@ ErrorCode Script::parseKeyStroke(const std::string &keyName, std::vector<uint8_t
     return ErrorCode::Success;
 }
 
+std::optional<Script> Script::deserialize(std::span<const uint8_t> input) {
+    Script::CommandVector commands{};
+
+    size_t inputByteIdx = 0u;
+    while(inputByteIdx < input.size()) {
+        Command command = static_cast<Command>(input[inputByteIdx]);
+        switch (command) {
+            case Command::StringWrite: {
+                if(++inputByteIdx >= input.size()){
+                    return std::nullopt;
+                }
+                uint8_t strLen = input[inputByteIdx];
+                std::string str{};
+                
+                for(uint8_t strIdx = 0u; strIdx < strLen; ++strIdx) {
+                    if(++inputByteIdx >= input.size()){
+                        return std::nullopt;
+                    }
+                    str += static_cast<char>(input[inputByteIdx]);
+                }
+
+                commands.emplace_back(command, std::move(str));
+
+                break;
+            }
+            case Command::KeyStroke: {
+                if(++inputByteIdx >= input.size()){
+                    return std::nullopt;
+                }
+                uint8_t keyCodesLen = input[inputByteIdx];
+                std::vector<uint8_t> keyCodes{};
+                
+                for(uint8_t keyCodeIdx = 0u; keyCodeIdx < keyCodesLen; ++keyCodeIdx) {
+                    if(++inputByteIdx >= input.size()){
+                        return std::nullopt;
+                    }
+                    keyCodes.push_back(input[inputByteIdx]);
+                }
+
+                commands.emplace_back(command, std::move(keyCodes));
+
+                break;
+            }
+            case Command::Delay: {
+                uint32_t delay = 0u;
+
+                uint8_t *bytePtr = reinterpret_cast<uint8_t*>(&delay);
+                for(size_t byteIdx = 0u; byteIdx < sizeof(delay); ++byteIdx){
+                    if(++inputByteIdx >= input.size()){
+                        return std::nullopt;
+                    }
+                    bytePtr[byteIdx] = input[inputByteIdx];
+                }
+
+                break;
+            }
+            default: {
+                LOGE("Unknown command in serialized data - it will not be included in command vector");
+            }
+        }
+
+        // Continue with next command in the next iteration
+        ++inputByteIdx;
+    }
+
+    return Script(commands);
+}
+
 std::optional<Script> Script::parse(std::string input){
     Script::CommandVector commands{};
 
@@ -290,11 +360,6 @@ std::optional<Script> Script::parse(std::string input){
     }
 
     return Script(std::move(commands));
-}
-
-std::optional<Script> Script::deserialize(std::span<const uint8_t> input) {
-    (void)input;
-    return std::nullopt; // TODO: Implement deserialization logic
 }
 
 Script::Script(Script::CommandVector &commands)
@@ -337,11 +402,133 @@ ErrorCode Script::run(UsbDevice &usbDevice) {
                 Utils::delay(delay);
                 break;
             }
-            default:
-                LOGE("Unknown command in command vector");
+            default: {
+                LOGE("Unknown command in command vector - will not be executed.");
                 return ErrorCode::GeneralError;
+            }
         }
     }
 
     return ErrorCode::Success;
+}
+
+std::string Script::toString() {
+    std::string scriptStr{};
+
+    for (const auto &command : commands) {
+        switch (std::get<0>(command)) {
+            case Command::StringWrite: {
+                const std::string &str = std::any_cast<std::string>(std::get<1>(command));
+
+                scriptStr += "STRING ";
+                scriptStr += str;
+
+                break;
+            }
+            case Command::KeyStroke: {
+                const std::vector<uint8_t> &keyCodes = std::any_cast<std::vector<uint8_t>>(std::get<1>(command));
+
+                const auto shiftIt = std::find(keyCodes.begin(), keyCodes.end(), HID_KEY_SHIFT_LEFT);
+
+                bool isShiftPresent = (shiftIt != keyCodes.end()) ? true : false;
+                bool isAnyAsciiCharPresent = false;
+
+                for(const uint8_t &keyCode : keyCodes){
+                    // Check if the keycode belongs to one of the special keys
+                    const auto specialKeyIt = std::find_if(specialKeys.begin(), specialKeys.end(), [&keyCode](const auto& specialKey) {return specialKey.keyCode == keyCode;});
+                    if(specialKeyIt != specialKeys.end()) {
+                        // The keycode is a special key
+                        
+                        // Skip the shift key as it will be added after the loop
+                        if(keyCode == HID_KEY_SHIFT_LEFT){
+                            continue;
+                        }
+
+                        scriptStr += specialKeyIt->name + " ";
+                    }
+                    else if(keyCode < ASCII_CHAR_NUM) {
+                        // The keycode is an ASCII character
+                        isAnyAsciiCharPresent = true;
+                        char ascii = isShiftPresent ? keycodeToAsciiConvTable[keyCode][1] : keycodeToAsciiConvTable[keyCode][0];
+                        scriptStr += ascii;
+                        scriptStr += " ";
+                    }
+                    else {
+                        LOGE("Unknown keycode in command vector - will not be printed");
+                    }
+                }
+
+                if(isShiftPresent && !isAnyAsciiCharPresent) {
+                    // The shift present and it was not implicitly added by an uppercase ascii
+                    // Print the key explicitly
+                    scriptStr += "SHIFT ";
+                }
+
+                break;
+            }
+            case Command::Delay: {
+                uint32_t delay = std::any_cast<uint32_t>(std::get<1>(command));
+
+                scriptStr += "DELAY ";
+                scriptStr += std::to_string(delay);
+
+                break;
+            }
+            default: {
+                LOGE("Unknown command in command vector - will not be printed");
+            }
+        }
+
+        // Add newline before the next command
+        scriptStr += "\n";
+    }
+
+    return scriptStr;
+}
+
+std::vector<uint8_t> Script::serialize() {
+    std::vector<uint8_t> serialized{};
+
+    for (const auto &command : commands) {
+        switch (std::get<0>(command)) {
+            case Command::StringWrite: {
+                const std::string &str = std::any_cast<std::string>(std::get<1>(command));
+                serialized.push_back(static_cast<uint8_t>(Command::StringWrite));
+                serialized.push_back(static_cast<uint8_t>(str.length()));
+
+                for(const auto& chr : str){
+                    serialized.push_back(static_cast<uint8_t>(chr));
+                }
+
+                break;
+            }
+            case Command::KeyStroke: {
+                const std::vector<uint8_t> &keyCodes = std::any_cast<std::vector<uint8_t>>(std::get<1>(command));
+                serialized.push_back(static_cast<uint8_t>(Command::KeyStroke));
+                serialized.push_back(static_cast<uint8_t>(keyCodes.size()));
+
+                for(const auto& keyCode : keyCodes){
+                    serialized.push_back(static_cast<uint8_t>(keyCode));
+                }
+
+                break;
+            }
+            case Command::Delay: {
+                uint32_t delay = std::any_cast<uint32_t>(std::get<1>(command));
+                serialized.push_back(static_cast<uint8_t>(Command::Delay));
+
+                uint8_t *bytePtr = reinterpret_cast<uint8_t*>(&delay);
+                for(size_t byteIdx = 0u; byteIdx < sizeof(delay); ++byteIdx){
+                    serialized.push_back(static_cast<uint8_t>(bytePtr[byteIdx]));
+                }
+
+                break;
+            }
+            default: {
+                LOGE("Unknown command in command vector - it will not be included in serialized data");
+            }
+        }
+    }
+
+    return serialized;
 }

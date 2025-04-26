@@ -50,6 +50,8 @@ private:
     static std::array<ExpressionHandler, EXPRESSIONS_NUM> expressionHandlers;
     static std::array<SpecialKey, SPECIAL_KEY_NUM> specialKeys;
     static const uint8_t asciiToKeycodeConvTable[ASCII_CHAR_NUM][ASCII_CONV_TABLE_DIM_NUM];
+    static const uint8_t keycodeToAsciiConvTable[ASCII_CHAR_NUM][ASCII_CONV_TABLE_DIM_NUM];
+
 
     static ErrorCode parseAscii(const char chr, std::vector<uint8_t> &keyCodes);
     static ErrorCode parseKeyStroke(const std::string &keyName, std::vector<uint8_t> &keyList);
@@ -63,7 +65,9 @@ public:
     ~Script() = default;
 
     ErrorCode run(UsbDevice &usbDevice);
+    std::string toString();
+    std::vector<uint8_t> serialize();
 
-    static std::optional<Script> parse(std::string input);
     static std::optional<Script> deserialize(std::span<const uint8_t> input);
+    static std::optional<Script> parse(std::string input);
 };
