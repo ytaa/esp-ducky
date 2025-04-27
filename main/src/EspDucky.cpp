@@ -12,13 +12,13 @@
 
 #include "EspDucky.hpp"
 #include "Logger.hpp"
-#include "Script.hpp"
 #include "StaticWebData.hpp"
 
 #define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
 
 EspDucky::EspDucky() :
 nvConfig(ArmingState::Unarmed, UsbDeviceType::Hid), 
+nvScript(std::nullopt),
 ap("esp-ducky", "ducky123"), 
 mdns("esp-ducky"), 
 http(std::unordered_map<std::string, HttpServer::StaticEndpoint>{
@@ -95,7 +95,7 @@ ErrorCode EspDucky::init() {
     }
 
     // Open NVS handle
-    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle("esp-ducky", NVS_READWRITE, &ret);
+    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle(NVS_NAMESPACE, NVS_READWRITE, &ret);
     if(ESP_OK != ret) {
         LOGC("Failed to open NVS handle with error: (%s). Aborting...", esp_err_to_name(ret));
     }
@@ -117,7 +117,7 @@ void EspDucky::handleNvConfig(nvs::NVSHandle *handle) {
     }
 
     // Read nvConfig from NVS
-    esp_err_t ret = handle->get_blob("nvConfig", &nvConfig, sizeof(nvConfig));
+    esp_err_t ret = handle->get_blob(NVS_NV_CONFIG_KEY, &nvConfig, sizeof(nvConfig));
     if(ESP_ERR_NVS_NOT_FOUND == ret)
     {
         LOGW("NVS data for nvConfig not found. Using default values.");
@@ -155,28 +155,18 @@ void EspDucky::handleNvConfig(nvs::NVSHandle *handle) {
 }
 
 void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
-    if(nvConfig.armingState == ArmingState::Unarmed) {
-        LOGI("Device is unarmed. No script is executed at startup.");
-        return;
-    }
-
-    if(UsbDeviceType::Hid != nvConfig.usbDeviceType && UsbDeviceType::HidMsd != nvConfig.usbDeviceType) {
-        LOGW("Device is not in HID mode. Script execution is not possible.");
-        return;
-    }
-
-    LOGI("Device is armed with HID enabled. Reading script from NVS...");
+    LOGI("Reading script from NVS...");
     
     // Read script size from NVS
     uint32_t nvScriptSize = 0u;
     std::unique_ptr<uint8_t[]> nvScriptData{nullptr};
 
-    esp_err_t ret = handle->get_item("nvScriptSize", nvScriptSize);
+    esp_err_t ret = handle->get_item(NVS_NV_SCRIPT_SIZE_KEY, nvScriptSize);
     if(ESP_OK == ret)
     {
         // Read script data from NVS
         nvScriptData = std::make_unique<uint8_t[]>(nvScriptSize);
-        ret = handle->get_blob("nvScriptData", nvScriptData.get(), nvScriptSize);
+        ret = handle->get_blob(NVS_NV_SCRIPT_DATA_KEY, nvScriptData.get(), nvScriptSize);
     }
 
     // Check if script size and data was found in the NVS
@@ -189,16 +179,30 @@ void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
     }
     else {
         // Parse the script
-        auto nvScript = Script::deserialize(std::span<const uint8_t>(nvScriptData.get(), nvScriptSize));
+        nvScript = Script::deserialize(std::span<const uint8_t>(nvScriptData.get(), nvScriptSize));
         if (!nvScript) {
             LOGE("Failed to deserialize script from NVS. The armed state is ignored.");
             return;
         }
         else {
-            if(!usb.isMounted()) {
+
+            if(nvConfig.armingState == ArmingState::Unarmed) {
+                LOGI("Device is unarmed. No script is executed at startup.");
+                return;
+            }
+        
+            if(UsbDeviceType::Hid != nvConfig.usbDeviceType && UsbDeviceType::HidMsd != nvConfig.usbDeviceType) {
+                LOGW("Device is not in HID mode. Script execution is not possible.");
+                return;
+            }
+
+            // The device is armed, HID is enabled and the script is successfully deserialized
+            if(!waitForUsbMount()) {
                 LOGW("USB device not mounted during startup. The armed state is ignored.");
                 return;
             }
+
+            LOGD("Running deserialized script from NVS:\n%s", nvScript->toString().c_str());
 
             // Run the script
             if (ErrorCode::Success != nvScript->run(usb)) {
@@ -216,7 +220,7 @@ void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
 
             // Reset the armed state to unarmed
             nvConfig.armingState = ArmingState::Unarmed;
-            ret = handle->set_blob("nvConfig", &nvConfig, sizeof(nvConfig));
+            ret = handle->set_blob(NVS_NV_CONFIG_KEY, &nvConfig, sizeof(nvConfig));
             if(ESP_OK != ret) {
                 LOGC("Failed to update NVS data with error: (%s). Aborting...", esp_err_to_name(ret));
             }
@@ -229,6 +233,26 @@ void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
             LOGI("Device is unarmed after script execution. Config stored in NVS.");
         }
     }
+}
+
+bool EspDucky::waitForUsbMount(uint32_t timeoutMs) {
+    uint32_t elapsedTime = 0u;
+
+    LOGI("Waiting for USB device to mount... (%d ms)", timeoutMs);
+
+    while(!usb.isMounted() && (elapsedTime < timeoutMs)) {
+        Utils::delay(100u);
+        elapsedTime += 100u;
+    }
+
+    if(!usb.isMounted()) {
+        LOGW("USB device not mounted after %d ms", timeoutMs);
+        return false;
+    }
+
+    LOGI("USB device mounted after ~%d ms", elapsedTime);
+
+    return true;
 }
 
 void EspDucky::run() {
@@ -274,7 +298,28 @@ ErrorCode EspDucky::handleScriptEndpoint(httpd_req_t &http, const std::string &r
 }
 
 ErrorCode EspDucky::handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response) {
-    return ErrorCode::NotImplemented;
+    cJSON *respJson = cJSON_CreateObject();
+    if (!respJson) {
+        LOGE("Failed to create JSON response object");
+        return ErrorCode::GeneralError;
+    }
+
+    // Ignore return value - the functions return pointer to the root object
+    (void)cJSON_AddStringToObject(respJson, "script", nvScript ? nvScript->toString().c_str() : "REM No script stored in the device\nREM Write your script here and press Run or Save button\n");
+
+    char *respJsonStr = cJSON_PrintUnformatted(respJson);
+    if( !respJsonStr) {
+        LOGE("Failed to create JSON string from response object");
+        cJSON_Delete(respJson); // Free the response json object
+        return ErrorCode::GeneralError;
+    }
+
+    response = respJsonStr;
+
+    std::free(respJsonStr); // Free the JSON string
+    cJSON_Delete(respJson); // Free the response json object
+
+    return ErrorCode::Success;
 }
 
 ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response) {
@@ -298,29 +343,42 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
         return ErrorCode::InvalidArgument;
     }
 
-    LOGD("Parsed script: '%s'", scriptJson->valuestring);
-    LOGD("Parsed action: '%d'", actionJson->valueint);
+    LOGD("Request script: '%s'", scriptJson->valuestring);
+    LOGD("Request action: '%d'", actionJson->valueint);
+
+    ScriptEndpointAction action = static_cast<ScriptEndpointAction>(actionJson->valueint);
 
     auto script = Script::parse(scriptJson->valuestring);
     cJSON_Delete(reqJson); // Free the request json object
-
-    LOGD("Script parsing successful");
 
     if (!script) {
         LOGE("Failed to parse script: %s", scriptJson->valuestring);
         return ErrorCode::GeneralError;
     }
 
-    if(usb.isMounted()) {
-        if (script->run(usb) != ErrorCode::Success) {
-            LOGE("Failed to run script: %s", scriptJson->valuestring);
-            return ErrorCode::GeneralError;
+    LOGD("Script parsing successful:\n%s", script->toString().c_str());
+
+    switch (action) {
+        case ScriptEndpointAction::Run: {
+            if (scriptRun(*script) != ErrorCode::Success) {
+                LOGE("Failed to run script");
+                return ErrorCode::GeneralError;
+            }
+            break;
+        }
+        case ScriptEndpointAction::Save: {
+            if (scriptSave(*script) != ErrorCode::Success) {
+                LOGE("Failed to save script");
+                return ErrorCode::GeneralError;
+            }
+            break;
+        }
+        default: {
+            LOGE("Invalid action: %d", action);
+            return ErrorCode::InvalidArgument;
         }
     }
-    else
-    {
-        LOGW("USB device not mounted. Skipping script execution.");
-    }
+
 
     // Prepare response
     cJSON *respJson = cJSON_CreateObject();
@@ -344,6 +402,69 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
     cJSON_Delete(respJson); // Free the response json object
 
     return ErrorCode::Success;    
+}
+
+ErrorCode EspDucky::scriptRun(Script &script) {
+    if(usb.isMounted()) {
+        LOGD("Starting script execution...");
+
+        if (script.run(usb) != ErrorCode::Success) {
+            LOGE("Failed to run script");
+            return ErrorCode::GeneralError;
+        }
+
+        LOGI("Script executed successfully");
+    }
+    else
+    {
+        LOGW("USB device not mounted. Skipping script execution.");
+    }
+
+    return ErrorCode::Success;
+}
+
+ErrorCode EspDucky::scriptSave(Script &script) {
+    auto serializedScript = script.serialize();
+    if (serializedScript.empty()) {
+        LOGE("Failed to serialize script");
+        return ErrorCode::GeneralError;
+    }
+
+    // Open NVS handle
+    esp_err_t ret = 0;
+    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle(NVS_NAMESPACE, NVS_READWRITE, &ret);
+    if(ESP_OK != ret) {
+        LOGE("Failed to open NVS handle with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+    
+    // Write script size to NVS
+    uint32_t scriptSize = static_cast<uint32_t>(serializedScript.size());
+    ret = handle->set_item(NVS_NV_SCRIPT_SIZE_KEY, scriptSize);
+    if(ESP_OK != ret) {
+        LOGE("Failed to update nvScriptSize with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+
+    // Write script data to NVS
+    ret = handle->set_blob(NVS_NV_SCRIPT_DATA_KEY, serializedScript.data(), scriptSize);
+    if(ESP_OK != ret) {
+        LOGE("Failed to update nvScriptData with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+
+    ret = handle->commit();
+    if(ESP_OK != ret) {
+        LOGE("Failed to commit NVS data with error: (%s)", esp_err_to_name(ret));
+        return ErrorCode::GeneralError;
+    }
+
+    // Store the script in nvScript variable
+    nvScript = std::move(script); 
+
+    LOGI("New script successfully stored in NVS");
+
+    return ErrorCode::Success;
 }
 
 ErrorCode EspDucky::handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response) {
@@ -409,8 +530,8 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
         return ErrorCode::InvalidArgument;
     }
 
-    LOGD("Parsed armingState: '%d'", armingStateJson->valueint);
-    LOGD("Parsed usbDeviceType: '%d'", usbDeviceTypeJson->valueint);
+    LOGD("Request armingState: '%d'", armingStateJson->valueint);
+    LOGD("Request usbDeviceType: '%d'", usbDeviceTypeJson->valueint);
 
     nvConfig.armingState = static_cast<ArmingState>(armingStateJson->valueint);
     nvConfig.usbDeviceType = static_cast<UsbDeviceType>(usbDeviceTypeJson->valueint);
@@ -419,14 +540,14 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
 
     // Open NVS handle
     esp_err_t ret = 0;
-    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle("esp-ducky", NVS_READWRITE, &ret);
+    std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle(NVS_NAMESPACE, NVS_READWRITE, &ret);
     if(ESP_OK != ret) {
         LOGE("Failed to open NVS handle with error: (%s)", esp_err_to_name(ret));
         return ErrorCode::GeneralError;
     }
     
     // Write nvConfig to NVS
-    ret = handle->set_blob("nvConfig", &nvConfig, sizeof(nvConfig));
+    ret = handle->set_blob(NVS_NV_CONFIG_KEY, &nvConfig, sizeof(nvConfig));
     if(ESP_OK != ret) {
         LOGE("Failed to update NVS data with error: (%s)", esp_err_to_name(ret));
         return ErrorCode::GeneralError;

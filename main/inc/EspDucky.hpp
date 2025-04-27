@@ -7,6 +7,7 @@
 #include "MdnsResponder.hpp"
 #include "UsbDevice.hpp"
 #include "Utils.hpp"
+#include "Script.hpp"
 
 class EspDucky
 {
@@ -26,13 +27,25 @@ private:
         HidMsd
     };
 
+    enum class ScriptEndpointAction : uint8_t
+    {
+        Run,
+        Save
+    };
+
     struct NvConfig 
     {
         ArmingState armingState;
         UsbDeviceType usbDeviceType;
     };
 
+    static constexpr const char *NVS_NAMESPACE = "esp-ducky";
+    static constexpr const char *NVS_NV_CONFIG_KEY = "nvConfig";
+    static constexpr const char *NVS_NV_SCRIPT_SIZE_KEY = "nvScriptSize";
+    static constexpr const char *NVS_NV_SCRIPT_DATA_KEY = "nvScriptData";
+
     NvConfig nvConfig;
+    std::optional<Script> nvScript;
     WiFiAccessPoint ap;
     MdnsResponder mdns;
     HttpServer http;
@@ -40,6 +53,18 @@ private:
 
     void handleNvConfig(nvs::NVSHandle *handle);
     void handleNvScript(nvs::NVSHandle *handle);
+    bool waitForUsbMount(uint32_t timeoutMs = 5000u);
+
+    ErrorCode handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
+
+    ErrorCode scriptRun(Script &script);
+    ErrorCode scriptSave(Script &script);
+    
+    ErrorCode handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
 
 public:
     EspDucky();
@@ -47,12 +72,4 @@ public:
 
     ErrorCode init();
     void run();
-
-    ErrorCode handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
-    
-    ErrorCode handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
 };

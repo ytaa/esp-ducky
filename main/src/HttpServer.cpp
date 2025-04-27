@@ -78,7 +78,7 @@ esp_err_t HttpServer::handleStaticEndpoint(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    LOGI("HTTP request received for static endpoint %s", req->uri);
+    LOGD("HTTP request received for static endpoint %s", req->uri);
 
     HttpServer *httpServer = static_cast<HttpServer *>(req->user_ctx);
     const StaticEndpoint &endpoint = httpServer->staticEndpoints.at(req->uri);
@@ -94,7 +94,7 @@ esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    LOGI("HTTP request received for dynamic endpoint %s", req->uri);
+    LOGD("HTTP request received for dynamic endpoint %s", req->uri);
 
     HttpServer *httpServer = static_cast<HttpServer *>(req->user_ctx);
     int ret, remaining = req->content_len;

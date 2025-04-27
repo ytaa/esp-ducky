@@ -44,6 +44,33 @@ function postScript(script, action) {
 	xhr.send(JSON.stringify(scriptReq));
 }
 
+function getScript() {
+	console.log("Sending GET /script endpoint");
+
+	// unregister subscription from the server
+	let xhr = new XMLHttpRequest();
+	xhr.open("GET", "script", true);
+
+	xhr.onreadystatechange = function () {
+		if (xhr.readyState === 4) {
+			if(xhr.status === 200)
+			{
+				var json = JSON.parse(xhr.responseText);
+				console.log("GET /script endpoint response: " + xhr.responseText);
+				scriptTextarea.value = json.script;
+				autoGrow(scriptTextarea);
+			}
+			else
+			{
+				console.error("GET /script endpoint error: " + xhr.statusText);
+			}
+		}
+	};
+
+	xhr.send();
+}
+
+
 function getConfig() {
 	console.log("Sending GET /config endpoint");
 
@@ -107,10 +134,10 @@ function autoGrow(element) {
 }
 
 scriptTextarea.addEventListener('input', () => autoGrow(scriptTextarea));
-autoGrow(scriptTextarea);
 
 scriptRunButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_RUN));
 scriptSaveButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_SAVE));
+scriptLoadButton.addEventListener('click', () => getScript());
 configSaveButton.addEventListener('click', () => postConfig());
 
 // Theme toggle functionality
@@ -140,4 +167,5 @@ themeToggle?.addEventListener("click", () => {
 });
 
 updateToggleLabel();
+getScript();
 getConfig();

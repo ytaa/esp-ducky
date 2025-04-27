@@ -311,6 +311,8 @@ std::optional<Script> Script::deserialize(std::span<const uint8_t> input) {
                     bytePtr[byteIdx] = input[inputByteIdx];
                 }
 
+                commands.emplace_back(command, delay);
+
                 break;
             }
             default: {
@@ -481,6 +483,11 @@ std::string Script::toString() {
 
         // Add newline before the next command
         scriptStr += "\n";
+    }
+
+    // Remove the last newline character
+    if (!scriptStr.empty()) {
+        scriptStr.pop_back();
     }
 
     return scriptStr;
