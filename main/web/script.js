@@ -13,8 +13,12 @@ const themeToggle = document.getElementById("themeToggle");
 const SCRIPT_ACTION_RUN = 0;
 const SCRIPT_ACTION_SAVE = 1;
 
-function postScript(script, action) {
+function postScript(btn, script, action) {
 	console.log("Sending POST /script endpoint");
+
+	let spinner = btn.querySelector('.spinner');
+	spinner.classList.remove('hidden');
+	btn.disabled = true;
 
 	// unregister subscription from the server
 	let xhr = new XMLHttpRequest();
@@ -28,6 +32,8 @@ function postScript(script, action) {
 
 	xhr.onreadystatechange = function () {
 		if (xhr.readyState === 4) {
+			spinner.classList.add('hidden');
+			btn.disabled = false;
 			if(xhr.status === 200)
 			{
 				//var json = JSON.parse(xhr.responseText);
@@ -37,6 +43,7 @@ function postScript(script, action) {
 			else
 			{
 				console.error("POST /script endpoint error: " + xhr.statusText);
+				alert("Error: " + xhr.status + " (" + xhr.statusText + ")");
 			}
 		}
 	};
@@ -44,8 +51,13 @@ function postScript(script, action) {
 	xhr.send(JSON.stringify(scriptReq));
 }
 
-function getScript() {
+function getScript(btn) {
 	console.log("Sending GET /script endpoint");
+
+	let spinner = btn.querySelector('.spinner');
+	spinner.classList.remove('hidden');
+	btn.disabled = true;
+
 
 	// unregister subscription from the server
 	let xhr = new XMLHttpRequest();
@@ -53,6 +65,8 @@ function getScript() {
 
 	xhr.onreadystatechange = function () {
 		if (xhr.readyState === 4) {
+			spinner.classList.add('hidden');
+			btn.disabled = false;
 			if(xhr.status === 200)
 			{
 				var json = JSON.parse(xhr.responseText);
@@ -63,6 +77,7 @@ function getScript() {
 			else
 			{
 				console.error("GET /script endpoint error: " + xhr.statusText);
+				alert("Error: " + xhr.status + " (" + xhr.statusText + ")");
 			}
 		}
 	};
@@ -97,8 +112,13 @@ function getConfig() {
 	xhr.send();
 }
 
-function postConfig() {
+function postConfig(btn) {
 	console.log("Sending POST /config endpoint");
+
+	let spinner = btn.querySelector('.spinner');
+	spinner.classList.remove('hidden');
+	btn.disabled = true;
+
 
 	// unregister subscription from the server
 	let xhr = new XMLHttpRequest();
@@ -112,6 +132,8 @@ function postConfig() {
 
 	xhr.onreadystatechange = function () {
 		if (xhr.readyState === 4) {
+			spinner.classList.add('hidden');
+			btn.disabled = false;
 			if(xhr.status === 200)
 			{
 				//var json = JSON.parse(xhr.responseText);
@@ -121,6 +143,7 @@ function postConfig() {
 			else
 			{
 				console.error("POST /config endpoint error: " + xhr.statusText);
+				alert("Error: " + xhr.status + " (" + xhr.statusText + ")");
 			}
 		}
 	};
@@ -135,10 +158,10 @@ function autoGrow(element) {
 
 scriptTextarea.addEventListener('input', () => autoGrow(scriptTextarea));
 
-scriptRunButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_RUN));
-scriptSaveButton.addEventListener('click', () => postScript(scriptTextarea.value, SCRIPT_ACTION_SAVE));
-scriptLoadButton.addEventListener('click', () => getScript());
-configSaveButton.addEventListener('click', () => postConfig());
+scriptRunButton.addEventListener('click', () => postScript(scriptRunButton, scriptTextarea.value, SCRIPT_ACTION_RUN));
+scriptSaveButton.addEventListener('click', () => postScript(scriptSaveButton, scriptTextarea.value, SCRIPT_ACTION_SAVE));
+scriptLoadButton.addEventListener('click', () => getScript(scriptLoadButton));
+configSaveButton.addEventListener('click', () => postConfig(configSaveButton));
 
 // Theme toggle functionality
 function setTheme(mode) {
@@ -167,5 +190,5 @@ themeToggle?.addEventListener("click", () => {
 });
 
 updateToggleLabel();
-getScript();
+getScript(scriptLoadButton);
 getConfig();
