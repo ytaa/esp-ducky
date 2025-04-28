@@ -48,15 +48,15 @@ http(std::unordered_map<std::string, HttpServer::StaticEndpoint>{
     },
 },std::unordered_map<std::string, HttpServer::DynamicEndpoint>{
     {"/script", {
-            .callback = [this](httpd_req_t &http, const std::string &request, std::string &response) {
-                return handleScriptEndpoint(http, request, response);
+            .callback = [this](httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
+                return handleScriptEndpoint(http, request, response, errCode);
             },
             .mime = "application/json"
         }
     },
     {"/config", {
-        .callback = [this](httpd_req_t &http, const std::string &request, std::string &response) {
-            return handleConfigEndpoint(http, request, response);
+        .callback = [this](httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
+            return handleConfigEndpoint(http, request, response, errCode);
         },
         .mime = "application/json"
     }
@@ -281,26 +281,30 @@ void EspDucky::run() {
     }
 }
 
-ErrorCode EspDucky::handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response) {
+ErrorCode EspDucky::handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
     switch(http.method) {
         case HTTP_GET: {
-            return handleScriptEndpointGet(http, request, response);
+            return handleScriptEndpointGet(http, request, response, errCode);
         }
         case HTTP_POST: {
-            return handleScriptEndpointPost(http, request, response);
+            return handleScriptEndpointPost(http, request, response, errCode);
         }
         default: {
             LOGE("Unsupported HTTP method: %d", http.method);
+            errCode = HTTPD_405_METHOD_NOT_ALLOWED;
+            response = "Method not allowed";
         }
     }
 
     return ErrorCode::InvalidArgument;
 }
 
-ErrorCode EspDucky::handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response) {
+ErrorCode EspDucky::handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
     cJSON *respJson = cJSON_CreateObject();
     if (!respJson) {
         LOGE("Failed to create JSON response object");
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -311,6 +315,8 @@ ErrorCode EspDucky::handleScriptEndpointGet(httpd_req_t &http, const std::string
     if( !respJsonStr) {
         LOGE("Failed to create JSON string from response object");
         cJSON_Delete(respJson); // Free the response json object
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -322,10 +328,12 @@ ErrorCode EspDucky::handleScriptEndpointGet(httpd_req_t &http, const std::string
     return ErrorCode::Success;
 }
 
-ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response) {
+ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
     cJSON *reqJson = cJSON_Parse(request.c_str());
     if (!reqJson) {
         LOGE("Failed to parse JSON: %s", cJSON_GetErrorPtr());
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid JSON format";
         return ErrorCode::InvalidArgument;
     }
 
@@ -333,6 +341,8 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
     if (!cJSON_IsString(scriptJson) || (scriptJson->valuestring == NULL)) {
         LOGE("Invalid JSON format: 'script' is not a string");
         cJSON_Delete(reqJson);
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid JSON format: 'script' is not a string";
         return ErrorCode::InvalidArgument;
     }
 
@@ -340,6 +350,8 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
     if (!cJSON_IsNumber(actionJson)) {
         LOGE("Invalid JSON format: 'action' is not a number");
         cJSON_Delete(reqJson);
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid JSON format: 'action' is not a number";
         return ErrorCode::InvalidArgument;
     }
 
@@ -349,11 +361,14 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
     ScriptEndpointAction action = static_cast<ScriptEndpointAction>(actionJson->valueint);
 
     auto script = Script::parse(scriptJson->valuestring);
+
     cJSON_Delete(reqJson); // Free the request json object
 
     if (!script) {
-        LOGE("Failed to parse script: %s", scriptJson->valuestring);
-        return ErrorCode::GeneralError;
+        LOGE("Failed to parse script");
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid script format";
+        return ErrorCode::InvalidArgument;
     }
 
     LOGD("Script parsing successful:\n%s", script->toString().c_str());
@@ -362,6 +377,8 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
         case ScriptEndpointAction::Run: {
             if (scriptRun(*script) != ErrorCode::Success) {
                 LOGE("Failed to run script");
+                errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+                response = "Failed to run script";
                 return ErrorCode::GeneralError;
             }
             break;
@@ -369,6 +386,8 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
         case ScriptEndpointAction::Save: {
             if (scriptSave(*script) != ErrorCode::Success) {
                 LOGE("Failed to save script");
+                errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+                response = "Failed to save script";
                 return ErrorCode::GeneralError;
             }
             break;
@@ -384,6 +403,8 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
     cJSON *respJson = cJSON_CreateObject();
     if (!respJson) {
         LOGE("Failed to create JSON response object");
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -393,6 +414,8 @@ ErrorCode EspDucky::handleScriptEndpointPost(httpd_req_t &http, const std::strin
     if (!respJsonStr) {
         LOGE("Failed to create JSON string from response object");
         cJSON_Delete(respJson); // Free the response json object
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -467,26 +490,30 @@ ErrorCode EspDucky::scriptSave(Script &script) {
     return ErrorCode::Success;
 }
 
-ErrorCode EspDucky::handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response) {
+ErrorCode EspDucky::handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
     switch(http.method) {
         case HTTP_GET: {
-            return handleConfigEndpointGet(http, request, response);
+            return handleConfigEndpointGet(http, request, response, errCode);
         }
         case HTTP_POST: {
-            return handleConfigEndpointPost(http, request, response);
+            return handleConfigEndpointPost(http, request, response, errCode);
         }
         default: {
             LOGE("Unsupported HTTP method: %d", http.method);
+            errCode = HTTPD_405_METHOD_NOT_ALLOWED;
+            response = "Method not allowed";
         }
     }
 
     return ErrorCode::InvalidArgument;
 }
 
-ErrorCode EspDucky::handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response) {
+ErrorCode EspDucky::handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
     cJSON *respJson = cJSON_CreateObject();
     if (!respJson) {
         LOGE("Failed to create JSON response object");
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -498,6 +525,8 @@ ErrorCode EspDucky::handleConfigEndpointGet(httpd_req_t &http, const std::string
     if( !respJsonStr) {
         LOGE("Failed to create JSON string from response object");
         cJSON_Delete(respJson); // Free the response json object
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -509,10 +538,12 @@ ErrorCode EspDucky::handleConfigEndpointGet(httpd_req_t &http, const std::string
     return ErrorCode::Success;
 }
 
-ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response) {
+ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode) {
     cJSON *reqJson = cJSON_Parse(request.c_str());
     if (!reqJson) {
         LOGE("Failed to parse JSON: %s", cJSON_GetErrorPtr());
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid JSON format";
         return ErrorCode::InvalidArgument;
     }
 
@@ -520,6 +551,8 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     if (!cJSON_IsNumber(armingStateJson)) {
         LOGE("Invalid JSON format: 'armingState' is not a number");
         cJSON_Delete(reqJson);
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid JSON format: 'armingState' is not a number";
         return ErrorCode::InvalidArgument;
     }
 
@@ -527,6 +560,8 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     if (!cJSON_IsNumber(usbDeviceTypeJson)) {
         LOGE("Invalid JSON format: 'usbDeviceType' is not a number");
         cJSON_Delete(reqJson);
+        errCode = HTTPD_400_BAD_REQUEST;
+        response = "Invalid JSON format: 'usbDeviceType' is not a number";
         return ErrorCode::InvalidArgument;
     }
 
@@ -543,6 +578,8 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     std::unique_ptr<nvs::NVSHandle> handle = nvs::open_nvs_handle(NVS_NAMESPACE, NVS_READWRITE, &ret);
     if(ESP_OK != ret) {
         LOGE("Failed to open NVS handle with error: (%s)", esp_err_to_name(ret));
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
     
@@ -550,12 +587,16 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     ret = handle->set_blob(NVS_NV_CONFIG_KEY, &nvConfig, sizeof(nvConfig));
     if(ESP_OK != ret) {
         LOGE("Failed to update NVS data with error: (%s)", esp_err_to_name(ret));
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
     ret = handle->commit();
     if(ESP_OK != ret) {
         LOGE("Failed to commit NVS data with error: (%s)", esp_err_to_name(ret));
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -565,6 +606,8 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     cJSON *respJson = cJSON_CreateObject();
     if (!respJson) {
         LOGE("Failed to create JSON response object");
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 
@@ -574,6 +617,8 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     if (!respJsonStr) {
         LOGE("Failed to create JSON string from response object");
         cJSON_Delete(respJson); // Free the response json object
+        errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        response = "Internal server error";
         return ErrorCode::GeneralError;
     }
 

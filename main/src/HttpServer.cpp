@@ -102,7 +102,7 @@ esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
     reqBuf[remaining] = '\0'; // Null-terminate the buffer
 
     while (remaining > 0) {
-        /* Read the data for the request */
+        // Read the data for the request
         if ((ret = httpd_req_recv(req, reqBuf.get(), remaining)) <= 0) {
             if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
@@ -114,15 +114,20 @@ esp_err_t HttpServer::handleDynamicEndpoint(httpd_req_t *req)
 
     LOGD("Request buffer content: '%s'", reqBuf.get());
 
-    /* Call the dynamic endpoint callback */
+    // Call the dynamic endpoint callback
     auto it = httpServer->dynamicEndpoints.find(req->uri);
     if(it != httpServer->dynamicEndpoints.end()) {
         auto endpoint = it->second;
         std::string response{};
-        ErrorCode err = endpoint.callback(*req, reqBuf.get(), response);
+        httpd_err_code_t errCode = HTTPD_500_INTERNAL_SERVER_ERROR;
+        ErrorCode err = endpoint.callback(*req, reqBuf.get(), response, errCode);
+
         if(err != ErrorCode::Success) {
-            LOGE("Failed to handle dynamic endpoint '%s' with error: %d", req->uri, err);
-            return ESP_FAIL;
+            LOGE("Failed to handle dynamic endpoint '%s' with error: %d, response: '%s'", req->uri, err, response.c_str());
+            httpd_resp_send_err(req, errCode, response.c_str());
+
+            // Return OK indicating that the request was handled successfully even if the response is an error
+            return ESP_OK;
         }
         
         if(!response.empty()) {

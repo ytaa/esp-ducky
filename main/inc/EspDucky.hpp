@@ -55,16 +55,16 @@ private:
     void handleNvScript(nvs::NVSHandle *handle);
     bool waitForUsbMount(uint32_t timeoutMs = 5000u);
 
-    ErrorCode handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleScriptEndpoint(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode);
+    ErrorCode handleScriptEndpointGet(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode);
+    ErrorCode handleScriptEndpointPost(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode);
 
     ErrorCode scriptRun(Script &script);
     ErrorCode scriptSave(Script &script);
     
-    ErrorCode handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response);
-    ErrorCode handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response);
+    ErrorCode handleConfigEndpoint(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode);
+    ErrorCode handleConfigEndpointGet(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode);
+    ErrorCode handleConfigEndpointPost(httpd_req_t &http, const std::string &request, std::string &response, httpd_err_code_t &errCode);
 
 public:
     EspDucky();

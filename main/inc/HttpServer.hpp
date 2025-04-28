@@ -13,7 +13,7 @@
 class HttpServer {
 public:
 
-    using EndpointCallback = std::function<ErrorCode(httpd_req_t &, const std::string&, std::string&)>;
+    using EndpointCallback = std::function<ErrorCode(httpd_req_t &, const std::string&, std::string&, httpd_err_code_t&)>;
     struct StaticEndpoint {
         const char *respBuf;
         size_t respLen;

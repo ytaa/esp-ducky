@@ -21,6 +21,6 @@ ErrorCode MdnsResponder::start() {
         return ErrorCode::GeneralError;
     }
 
-    LOGI("mDNS initialized succesfully. Hostname: %s.local", hostname.c_str());
+    LOGI("mDNS responder initialized successfully. Hostname: %s.local", hostname.c_str());
     return ErrorCode::Success;
 }
