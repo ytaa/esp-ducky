@@ -7,6 +7,7 @@
 
 #include "tinyusb.h"
 #include "class/hid/hid_device.h"
+#include "tusb_msc_storage.h"
 
 #include "Utils.hpp"
 
@@ -18,16 +19,31 @@ class UsbDevice
 {
 private:
     bool isStartedFlag;
+    wl_handle_t wl_handle;
+    uint8_t interfaceCount;
+    uint8_t configurationDescriptorTotalLength;
+    tusb_desc_device_t deviceDescriptor;
     std::vector<uint8_t> reportDescriptor;
     std::vector<const char *> stringDescriptor;
     std::vector<uint8_t> configurationDescriptor;
     static std::vector<UsbDevice*> instances;
+
+    void enableHID();
+    void enableMSC();
 public:
+
+    enum class DeviceClass : uint8_t
+    {
+        SerialJtag,
+        Hid,
+        Msc,
+        HidMsc
+    };
 
     UsbDevice();
     virtual ~UsbDevice();
 
-    ErrorCode start();
+    ErrorCode start(DeviceClass deviceClass);
     ErrorCode stop();
 
     bool isStarted() const;

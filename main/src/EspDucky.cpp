@@ -17,7 +17,7 @@
 #define APP_BUTTON (GPIO_NUM_0) // Use BOOT signal by default
 
 EspDucky::EspDucky() :
-nvConfig(ArmingState::Unarmed, UsbDeviceType::Hid), 
+nvConfig(ArmingState::Unarmed, UsbDevice::DeviceClass::Hid), 
 nvScript(std::nullopt),
 ap("esp-ducky", "ducky123"), 
 mdns("esp-ducky"), 
@@ -127,30 +127,9 @@ void EspDucky::handleNvConfig(nvs::NVSHandle *handle) {
     }
 
     // Handle USB device configuration
-    switch(nvConfig.usbDeviceType) {
-        case UsbDeviceType::SerialJtag: {
-            LOGI("Starting USB Serial JTAG device...");
-            // No action needed, as the USB Serial JTAG device is started by default
-            break;
-        }
-        case UsbDeviceType::Hid: {
-            LOGI("Starting USB HID device...");
-            usb.start();
-            break;
-        }
-        case UsbDeviceType::Msd: {
-            LOGW("USB MSD device is not supported yet. Starting Serial JTAG device instead...");
-            // No action needed, as the USB Serial JTAG device is started by default
-            break;
-        }
-        case UsbDeviceType::HidMsd: {
-            LOGW("USB MSD device is not supported yet. Starting only HID device instead...");
-            usb.start();
-            break;
-        }
-        default: {
-            LOGC("Invalid USB device type in nvConfig data. Aborting...");
-        }
+    ErrorCode res = usb.start(nvConfig.usbDeviceType);
+    if(ErrorCode::Success != res) {
+        LOGC("Failed to start USB device with error: %d. Aborting...", res);
     }
 }
 
@@ -191,7 +170,7 @@ void EspDucky::handleNvScript(nvs::NVSHandle *handle) {
                 return;
             }
         
-            if(UsbDeviceType::Hid != nvConfig.usbDeviceType && UsbDeviceType::HidMsd != nvConfig.usbDeviceType) {
+            if(UsbDevice::DeviceClass::Hid != nvConfig.usbDeviceType && UsbDevice::DeviceClass::HidMsc != nvConfig.usbDeviceType) {
                 LOGW("Device is not in HID mode. Script execution is not possible.");
                 return;
             }
@@ -569,7 +548,7 @@ ErrorCode EspDucky::handleConfigEndpointPost(httpd_req_t &http, const std::strin
     LOGD("Request usbDeviceType: '%d'", usbDeviceTypeJson->valueint);
 
     nvConfig.armingState = static_cast<ArmingState>(armingStateJson->valueint);
-    nvConfig.usbDeviceType = static_cast<UsbDeviceType>(usbDeviceTypeJson->valueint);
+    nvConfig.usbDeviceType = static_cast<UsbDevice::DeviceClass>(usbDeviceTypeJson->valueint);
 
     cJSON_Delete(reqJson); // Free the request json object
 

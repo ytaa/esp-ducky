@@ -19,14 +19,6 @@ private:
         Persistent
     };
 
-    enum class UsbDeviceType : uint8_t
-    {
-        SerialJtag,
-        Hid,
-        Msd,
-        HidMsd
-    };
-
     enum class ScriptEndpointAction : uint8_t
     {
         Run,
@@ -36,7 +28,7 @@ private:
     struct NvConfig 
     {
         ArmingState armingState;
-        UsbDeviceType usbDeviceType;
+        UsbDevice::DeviceClass usbDeviceType;
     };
 
     static constexpr const char *NVS_NAMESPACE = "esp-ducky";

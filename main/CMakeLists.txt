@@ -17,6 +17,6 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
 endif()
 
 idf_component_register(SRCS "src/Main.cpp" "src/WiFiAccessPoint.cpp" "src/Logger.cpp" "src/HttpServer.cpp" "src/MdnsResponder.cpp" "src/UsbDevice.cpp" "src/UsbCallbacks.cpp" "src/Script.cpp" "src/EspDucky.cpp" "src/Utils.cpp" ${WEB_FILES_OBJ}
-                       PRIV_REQUIRES esp_wifi spi_flash nvs_flash esp_http_server esp_driver_gpio esp_driver_usb_serial_jtag json
+                       PRIV_REQUIRES esp_wifi spi_flash nvs_flash esp_http_server esp_driver_gpio esp_driver_usb_serial_jtag json fatfs wear_levelling esp_partition
                        INCLUDE_DIRS "inc"
                        WHOLE_ARCHIVE)
