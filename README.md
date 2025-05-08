@@ -3,7 +3,13 @@ A BadUSB device based on ESP32 SoC and ESP-IDF framework, capable of running bas
 
 The device emulates a keyboard (USB Human Interface Device - HID) and once plugged into a computer, it automatically initiates a series of keystrokes based on the stored DuckyScript payload. 
 
-Additionally, the device can be configured to be recognized as a USB Mass Storage Class device (USB MSC), which allows it to be perceived as a regular USB flash drive. It allows storage of user data, utilizing the builtin ESP32 SPI flash memory. 
+Additionally, the device can be configured to be recognized as a USB Mass Storage Class device (USB MSC), which allows it to be perceived as a regular USB flash drive. It allows storage of user data, utilizing the builtin ESP32 SPI flash memory.
+
+### Table of Contents
+1. [Hardware](#hardware)
+2. [Web Interface](#web-interface)
+3. [DuckyScript Support](#duckyscript-support)
+4. [Building and Flashing](#building-and-flashing)
 
 ## Hardware
 
