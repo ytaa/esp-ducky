@@ -20,7 +20,7 @@ The project should be functional on any ESP32 SoC with USB-OTG support and >4MB 
 Example deployments:
 
 - ESP32-S3 Super Mini with a USB3.0 to Type-C Male Adapter
-<br /><img src="doc/img/hw_esp32_s3_super_mini.jpg" alt="esp-ducky deployment on a ESP32-S3 Super Mini board" width="250"/>
+<br /><img src="doc/img/hw_esp32_s3_super_mini_open.jpg" alt="esp-ducky deployment on a ESP32-S3 Super Mini board" width="250"/><img src="doc/img/hw_esp32_s3_super_mini_closed.jpg" alt="esp-ducky deployment on a ESP32-S3 Super Mini board" width="250"/>
 
 ## Web Interface
 
