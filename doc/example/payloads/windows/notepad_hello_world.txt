@@ -1,0 +1,21 @@
+REM Initial 2s delay added in order to wait for the 
+REM file explorer window popup issued due to connection
+REM of a new drive. This line can be removed if the 
+REM device is operating in HID only mode
+DELAY 2000
+
+REM Open "Run" window
+GUI r
+DELAY 500
+
+REM Open notepad.exe
+STRING notepad.exe
+ENTER
+DELAY 500
+
+REM Create a new tab in the notepad
+CTRL n
+DELAY 100
+
+REM Say hello
+STRING Hello World!
