@@ -11,7 +11,7 @@ std::array<Script::SpecialKey, Script::SPECIAL_KEY_NUM> Script::specialKeys = {{
     {"UP", HID_KEY_ARROW_UP},//
     {"UPARROW", HID_KEY_ARROW_UP},
     {"DOWN", HID_KEY_ARROW_DOWN},
-    {"DOWNARROW ", HID_KEY_ARROW_DOWN},
+    {"DOWNARROW", HID_KEY_ARROW_DOWN},
     {"LEFT", HID_KEY_ARROW_LEFT},
     {"LEFTARROW", HID_KEY_ARROW_LEFT},
     {"RIGHT", HID_KEY_ARROW_RIGHT},
@@ -83,7 +83,7 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
         }
     },
     { // STRING
-        R"(^( |\t)*?STRING (([\S]| |\t)+?)\n)", 
+        R"(^( |\t)*?STRING ([\s\S]+?)\n)", 
         [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match the string command and parameter without ignoring leading and trailing spaces
             // The parameter should be available in the match group with index 2
@@ -99,7 +99,7 @@ std::array<Script::ExpressionHandler, Script::EXPRESSIONS_NUM> Script::expressio
         }
     },
     { // STRINGLN
-        R"(^( |\t)*?STRINGLN (([\S]| |\t)+?)\n)", 
+        R"(^( |\t)*?STRINGLN ([\s\S]+?)\n)", 
         [](std::smatch &match, Script::CommandVector &commands) {
             // The regex should match the stringln command and parameter without ignoring leading and trailing spaces
             // The parameter should be available in the match group with index 2
