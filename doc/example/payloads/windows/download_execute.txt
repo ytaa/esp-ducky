@@ -1,3 +1,6 @@
+REM This script downloads a batch file from a remote 
+REM server and executes it with admin privileges
+
 REM Initial 2s delay added in order to wait for the 
 REM file explorer window popup issued due to connection
 REM of a new drive. This line can be removed if the 
