@@ -37,7 +37,9 @@ After connecting to the AP, the web interface is accessible with mDNS URL http:/
 The *Script Editor* section enables modification of the DuckyScript payload. It contains a modifiable text area which on load is filled with the currently stored DuckyScript payload. Additionally, it contains multiple buttons:
 - *Run* - Once pressed, the current content of the *Script Editor* text area is executed. The execution is only possible if the USB HID device is enabled and mounted to a USB host. 
 - *Load* - Once pressed, the current content of the *Script Editor* text area is filled with the currently stored DuckyScript payload.
-- *Save* - Once pressed, the current content of the *Script Editor* text area is stored on the device for future execution (see [configuration of arming state](#arming-state)). For efficiency, the script is not stored as a plain text. It is stored in a "compiled" form. The script may be looking differently once stored and loaded back, e.g. the comments will be gone, but the script semantics shall remain unchanged.   
+- *Save* - Once pressed, the current content of the *Script Editor* text area is stored on the device for future execution (see [configuration of arming state](#arming-state)). For efficiency, the script is not stored as a plain text. It is stored in a "compiled" form. The script may be looking differently once stored and loaded back, e.g. the comments will be gone, but the script semantics shall remain unchanged.
+
+For more details about valid payloads see [DuckyScript Support section](#duckyscript-support) and [example payloads](doc/example/payloads/).
 
 ### Configuration Editor
 The *Configuration Editor* section enables modification of the device configuration. On load, all configuration options are set to the values currently stored in the device. Any changes done to the configuration options are stored in the device only after the *Save* button is pressed. The changes are applied after the device reset.  
@@ -73,7 +75,7 @@ List of supported keywords:
 
 Additionally, the parser supports sending of special keys, modifiers and combination of key / modifier / ascii character. 
 
-For more details regarding the key names and exact syntax, please refer to the official [DuckyScript documentation](https://docs.hak5.org/hak5-usb-rubber-ducky/duckyscript-tm-quick-reference).
+For more details regarding the key names and exact syntax, please refer to the official [DuckyScript documentation](https://docs.hak5.org/hak5-usb-rubber-ducky/duckyscript-tm-quick-reference). Please also check the [example payloads](doc/example/payloads/).
 
 ## Building and Flashing
 
