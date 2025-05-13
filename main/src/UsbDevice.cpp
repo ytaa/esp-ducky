@@ -135,7 +135,7 @@ ErrorCode UsbDevice::start(UsbDevice::DeviceClass deviceClass) {
         case DeviceClass::SerialJtag:
             LOGI("Starting USB Serial JTAG device...");
             // No additional configuration needed for Serial JTAG
-            break;
+            return ErrorCode::Success;
         case DeviceClass::Hid:
             LOGI("Starting USB HID device...");
             enableHID();
