@@ -430,40 +430,24 @@ std::string Script::toString() {
             case Command::KeyStroke: {
                 const std::vector<uint8_t> &keyCodes = std::any_cast<std::vector<uint8_t>>(std::get<1>(command));
 
-                const auto shiftIt = std::find(keyCodes.begin(), keyCodes.end(), HID_KEY_SHIFT_LEFT);
-
-                bool isShiftPresent = (shiftIt != keyCodes.end()) ? true : false;
-                bool isAnyAsciiCharPresent = false;
-
                 for(const uint8_t &keyCode : keyCodes){
                     // Check if the keycode belongs to one of the special keys
                     const auto specialKeyIt = std::find_if(specialKeys.begin(), specialKeys.end(), [&keyCode](const auto& specialKey) {return specialKey.keyCode == keyCode;});
                     if(specialKeyIt != specialKeys.end()) {
                         // The keycode is a special key
-                        
-                        // Skip the shift key as it will be added after the loop
-                        if(keyCode == HID_KEY_SHIFT_LEFT){
-                            continue;
-                        }
-
                         scriptStr += specialKeyIt->name + " ";
                     }
                     else if(keyCode < ASCII_CHAR_NUM) {
                         // The keycode is an ASCII character
-                        isAnyAsciiCharPresent = true;
-                        char ascii = isShiftPresent ? keycodeToAsciiConvTable[keyCode][1] : keycodeToAsciiConvTable[keyCode][0];
+                        // Use the "lower-case" version of the keycode for printing
+                        // Shift key is added separately as a special key
+                        char ascii = keycodeToAsciiConvTable[keyCode][0];
                         scriptStr += ascii;
                         scriptStr += " ";
                     }
                     else {
                         LOGE("Unknown keycode in command vector - will not be printed");
                     }
-                }
-
-                if(isShiftPresent && !isAnyAsciiCharPresent) {
-                    // The shift present and it was not implicitly added by an uppercase ascii
-                    // Print the key explicitly
-                    scriptStr += "SHIFT ";
                 }
 
                 break;
